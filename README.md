@@ -32,5 +32,4 @@
 
 📄 Основано на [Telegram for Android](https://github.com/DrKLO/Telegram) — GNU GPL v2
 
-</div>TEST
-TEST
+</div>
