@@ -65,7 +65,6 @@ import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
-import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -84,6 +83,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.pm.ShortcutInfoCompat;
 import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.core.graphics.ColorUtils;
+import androidx.core.splashscreen.SplashScreen;
 
 import com.google.android.gms.common.api.Status;
 import com.google.common.primitives.Longs;
@@ -307,7 +307,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     private Dialog proxyErrorDialog;
     private SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow selectAnimatedEmojiDialog;
     private View rippleAbove;
-    private FrameLayout splashOverlayView;
+    private final AtomicBoolean splashReady = new AtomicBoolean(false);
     public Dialog getVisibleDialog() {
         for (int i = visibleDialogs.size() - 1; i >= 0; --i) {
             Dialog dialog = visibleDialogs.get(i);
@@ -320,53 +320,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
     public FrameLayout getFrameLayout() {
         return frameLayout;
-    }
-
-    private void showLaunchSplashOverlay() {
-        if (frameLayout == null || splashOverlayView != null) {
-            return;
-        }
-        splashOverlayView = new FrameLayout(this);
-        splashOverlayView.setBackgroundColor(Color.BLACK);
-        splashOverlayView.setClickable(true);
-
-        ImageView logoView = new ImageView(this);
-        logoView.setImageResource(R.mipmap.icon_1_foreground_sa);
-        logoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        int logoSize = dp(132);
-        FrameLayout.LayoutParams logoParams = new FrameLayout.LayoutParams(logoSize, logoSize, Gravity.CENTER);
-        splashOverlayView.addView(logoView, logoParams);
-
-        frameLayout.addView(splashOverlayView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        logoView.setAlpha(0f);
-        logoView.setScaleX(0.72f);
-        logoView.setScaleY(0.72f);
-        logoView.setRotation(-18f);
-        logoView.animate()
-                .alpha(1f)
-                .rotationBy(378f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(700L)
-                .setInterpolator(new OvershootInterpolator())
-                .start();
-
-        splashOverlayView.postDelayed(() -> {
-            if (splashOverlayView == null) {
-                return;
-            }
-            splashOverlayView.animate()
-                    .alpha(0f)
-                    .setDuration(220L)
-                    .withEndAction(() -> {
-                        if (frameLayout != null && splashOverlayView != null && splashOverlayView.getParent() == frameLayout) {
-                            frameLayout.removeView(splashOverlayView);
-                        }
-                        splashOverlayView = null;
-                    })
-                    .start();
-        }, 900L);
     }
 
     private Dialog localeDialog;
@@ -428,6 +381,27 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         isActive = true;
+        final SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
+        splashScreen.setKeepOnScreenCondition(() -> !splashReady.get());
+        splashScreen.setOnExitAnimationListener(splashScreenViewProvider -> {
+            View splashView = splashScreenViewProvider.getView();
+            View iconView = splashScreenViewProvider.getIconView();
+            if (iconView != null) {
+                iconView.setPivotX(iconView.getWidth() * 0.5f);
+                iconView.setPivotY(iconView.getHeight() * 0.5f);
+                iconView.animate()
+                        .rotationBy(360f)
+                        .scaleX(1.2f)
+                        .scaleY(1.2f)
+                        .setDuration(520L)
+                        .start();
+            }
+            splashView.animate()
+                    .alpha(0f)
+                    .setDuration(260L)
+                    .withEndAction(splashScreenViewProvider::remove)
+                    .start();
+        });
         if (BuildVars.DEBUG_VERSION) {
             StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
                 .detectLeakedClosableObjects()
@@ -584,7 +558,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             }
         });
         actionBarLayout.setDelegate(this);
-        showLaunchSplashOverlay();
         Theme.loadWallpaper(true);
 
         checkCurrentAccount();
@@ -681,6 +654,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         checkLayout();
         checkSystemBarColors();
         handleIntent(getIntent(), false, savedInstanceState != null, false, null, true, true);
+        splashReady.set(true);
         try {
             String os1 = Build.DISPLAY;
             String os2 = Build.USER;

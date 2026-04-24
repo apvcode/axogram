@@ -3,7 +3,7 @@
 
     <!--THEMES-->
 
-    <style name="Theme.TMessages.Start" parent="Theme.AppCompat.Light">
+    <style name="Theme.TMessages.Start" parent="Theme.SplashScreen.IconBackground">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:actionBarStyle">@style/ActionBar.Transparent.TMessages.Start</item>
@@ -11,6 +11,7 @@
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:textViewStyle">@style/MyTextViewStyle</item>
+        <item name="postSplashScreenTheme">@style/Theme.TMessages</item>
     </style>
 
     <style name="Theme.TMessages" parent="Theme.AppCompat.Light">
