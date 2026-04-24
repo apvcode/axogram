@@ -65,6 +65,7 @@ import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -306,6 +307,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     private Dialog proxyErrorDialog;
     private SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow selectAnimatedEmojiDialog;
     private View rippleAbove;
+    private FrameLayout splashOverlayView;
     public Dialog getVisibleDialog() {
         for (int i = visibleDialogs.size() - 1; i >= 0; --i) {
             Dialog dialog = visibleDialogs.get(i);
@@ -318,6 +320,53 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
 
     public FrameLayout getFrameLayout() {
         return frameLayout;
+    }
+
+    private void showLaunchSplashOverlay() {
+        if (frameLayout == null || splashOverlayView != null) {
+            return;
+        }
+        splashOverlayView = new FrameLayout(this);
+        splashOverlayView.setBackgroundColor(Color.BLACK);
+        splashOverlayView.setClickable(true);
+
+        ImageView logoView = new ImageView(this);
+        logoView.setImageResource(R.mipmap.icon_1_foreground_sa);
+        logoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        int logoSize = dp(132);
+        FrameLayout.LayoutParams logoParams = new FrameLayout.LayoutParams(logoSize, logoSize, Gravity.CENTER);
+        splashOverlayView.addView(logoView, logoParams);
+
+        frameLayout.addView(splashOverlayView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        logoView.setAlpha(0f);
+        logoView.setScaleX(0.72f);
+        logoView.setScaleY(0.72f);
+        logoView.setRotation(-18f);
+        logoView.animate()
+                .alpha(1f)
+                .rotationBy(378f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(700L)
+                .setInterpolator(new OvershootInterpolator())
+                .start();
+
+        splashOverlayView.postDelayed(() -> {
+            if (splashOverlayView == null) {
+                return;
+            }
+            splashOverlayView.animate()
+                    .alpha(0f)
+                    .setDuration(220L)
+                    .withEndAction(() -> {
+                        if (frameLayout != null && splashOverlayView != null && splashOverlayView.getParent() == frameLayout) {
+                            frameLayout.removeView(splashOverlayView);
+                        }
+                        splashOverlayView = null;
+                    })
+                    .start();
+        }, 900L);
     }
 
     private Dialog localeDialog;
@@ -535,6 +584,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             }
         });
         actionBarLayout.setDelegate(this);
+        showLaunchSplashOverlay();
         Theme.loadWallpaper(true);
 
         checkCurrentAccount();

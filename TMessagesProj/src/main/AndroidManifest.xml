@@ -115,7 +115,7 @@
 
         <activity-alias
             android:enabled="true"
-            android:name="space.axolab.axogram.ClassicIcon"
+            android:name="space.axolab.axogram.AxoGramIcon"
             android:targetActivity="space.axolab.axogram.ui.LaunchActivity"
             android:icon="@mipmap/icon_1_launcher"
             android:roundIcon="@mipmap/icon_1_launcher_round"

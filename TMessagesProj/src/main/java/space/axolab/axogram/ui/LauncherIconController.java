@@ -17,8 +17,8 @@ public class LauncherIconController {
             }
         }
 
-        if (enabledIcon == null) {
-            enabledIcon = LauncherIcon.CLASSIC;
+        if (enabledIcon == LauncherIcon.DEFAULT || enabledIcon == null) {
+            enabledIcon = LauncherIcon.AXOGRAM;
         }
 
         setIcon(enabledIcon);
@@ -46,7 +46,7 @@ public class LauncherIconController {
     }
 
     public enum LauncherIcon {
-        CLASSIC("ClassicIcon", R.drawable.icon_background_sa, R.mipmap.icon_1_foreground_sa, R.string.AppIconClassic),
+        AXOGRAM("AxoGramIcon", R.drawable.icon_1_background_sa, R.mipmap.icon_1_foreground_sa, R.string.AppIconAxoGram),
         DEFAULT("DefaultIcon", R.drawable.icon_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconDefault),
         VINTAGE("VintageIcon", R.drawable.icon_6_background_sa, R.mipmap.icon_6_foreground_sa, R.string.AppIconVintage),
         AQUA("AquaIcon", R.drawable.icon_4_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconAqua),
