@@ -72,6 +72,8 @@ dependencies {
 }
 
 def isWindows = String.valueOf(DefaultNativePlatform.currentOperatingSystem.toFamilyName() == OperatingSystemFamily.WINDOWS)
+def appId = getProps("API_ID") ?: "0"
+def appHash = getProps("API_HASH") ?: ""
 android {
     compileSdkVersion 35
     buildToolsVersion '35.0.0'
@@ -102,6 +104,8 @@ android {
     defaultConfig {
         minSdkVersion 21
         targetSdkVersion 35
+        buildConfigField "int", "APP_ID", appId
+        buildConfigField "String", "APP_HASH", "\"" + appHash + "\""
 
         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
 

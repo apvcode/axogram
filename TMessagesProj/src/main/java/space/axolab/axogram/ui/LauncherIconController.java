@@ -9,19 +9,31 @@ import space.axolab.axogram.R;
 
 public class LauncherIconController {
     public static void tryFixLauncherIconIfNeeded() {
+        LauncherIcon enabledIcon = null;
         for (LauncherIcon icon : LauncherIcon.values()) {
-            if (isEnabled(icon)) {
-                return;
+            if (isExplicitlyEnabled(icon)) {
+                enabledIcon = icon;
+                break;
             }
         }
 
-        setIcon(LauncherIcon.DEFAULT);
+        if (enabledIcon == null) {
+            enabledIcon = LauncherIcon.CLASSIC;
+        }
+
+        setIcon(enabledIcon);
     }
 
     public static boolean isEnabled(LauncherIcon icon) {
         Context ctx = ApplicationLoader.applicationContext;
         int i = ctx.getPackageManager().getComponentEnabledSetting(icon.getComponentName(ctx));
         return i == PackageManager.COMPONENT_ENABLED_STATE_ENABLED || i == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && icon == LauncherIcon.DEFAULT;
+    }
+
+    private static boolean isExplicitlyEnabled(LauncherIcon icon) {
+        Context ctx = ApplicationLoader.applicationContext;
+        int i = ctx.getPackageManager().getComponentEnabledSetting(icon.getComponentName(ctx));
+        return i == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
     }
 
     public static void setIcon(LauncherIcon icon) {
@@ -34,6 +46,7 @@ public class LauncherIconController {
     }
 
     public enum LauncherIcon {
+        CLASSIC("ClassicIcon", R.drawable.icon_background_sa, R.mipmap.icon_1_foreground_sa, R.string.AppIconClassic),
         DEFAULT("DefaultIcon", R.drawable.icon_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconDefault),
         VINTAGE("VintageIcon", R.drawable.icon_6_background_sa, R.mipmap.icon_6_foreground_sa, R.string.AppIconVintage),
         AQUA("AquaIcon", R.drawable.icon_4_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconAqua),

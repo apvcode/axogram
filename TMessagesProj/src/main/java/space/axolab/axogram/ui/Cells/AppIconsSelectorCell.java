@@ -9,8 +9,6 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.text.Spannable;
-import android.text.SpannableString;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -29,20 +27,15 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import space.axolab.axogram.AndroidUtilities;
 import space.axolab.axogram.LocaleController;
-import space.axolab.axogram.MessagesController;
 import space.axolab.axogram.NotificationCenter;
 import space.axolab.axogram.R;
-import space.axolab.axogram.UserConfig;
 import space.axolab.axogram.ui.ActionBar.BaseFragment;
 import space.axolab.axogram.ui.ActionBar.Theme;
 import space.axolab.axogram.ui.Components.Bulletin;
-import space.axolab.axogram.ui.Components.ColoredImageSpan;
 import space.axolab.axogram.ui.Components.Easings;
 import space.axolab.axogram.ui.Components.LayoutHelper;
-import space.axolab.axogram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import space.axolab.axogram.ui.Components.RecyclerListView;
 import space.axolab.axogram.ui.LauncherIconController;
-import space.axolab.axogram.ui.PremiumPreviewFragment;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -109,10 +102,6 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
         setOnItemClickListener((view, position) -> {
             IconHolderView holderView = (IconHolderView) view;
             LauncherIconController.LauncherIcon icon = availableIcons.get(position);
-            if (icon.premium && !UserConfig.hasPremiumOnAccounts()) {
-                fragment.showDialog(new PremiumFeatureBottomSheet(fragment, PremiumPreviewFragment.PREMIUM_FEATURE_APPLICATION_ICONS, true));
-                return;
-            }
 
             if (LauncherIconController.isEnabled(icon)) {
                 return;
@@ -151,14 +140,6 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
     private void updateIconsVisibility() {
         availableIcons.clear();
         availableIcons.addAll(Arrays.asList(LauncherIconController.LauncherIcon.values()));
-        if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
-            for (int i = 0; i < availableIcons.size(); i++) {
-                if (availableIcons.get(i).premium) {
-                    availableIcons.remove(i);
-                    i--;
-                }
-            }
-        }
         getAdapter().notifyDataSetChanged();
         invalidateItemDecorations();
 
@@ -275,19 +256,8 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
             iconView.setImageResource(icon.background);
 
             MarginLayoutParams params = (MarginLayoutParams) titleView.getLayoutParams();
-            if (icon.premium && !UserConfig.hasPremiumOnAccounts()) {
-                SpannableString str = new SpannableString("d " + LocaleController.getString(icon.title));
-                ColoredImageSpan span = new ColoredImageSpan(R.drawable.msg_mini_premiumlock);
-                span.setTopOffset(1);
-                span.setSize(AndroidUtilities.dp(13));
-                str.setSpan(span, 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-                params.rightMargin = AndroidUtilities.dp(4);
-                titleView.setText(str);
-            } else {
-                params.rightMargin = 0;
-                titleView.setText(LocaleController.getString(icon.title));
-            }
+            params.rightMargin = 0;
+            titleView.setText(LocaleController.getString(icon.title));
             setSelected(LauncherIconController.isEnabled(icon), false);
         }
     }
