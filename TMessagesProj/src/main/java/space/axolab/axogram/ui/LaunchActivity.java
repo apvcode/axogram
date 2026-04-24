@@ -308,6 +308,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     private SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow selectAnimatedEmojiDialog;
     private View rippleAbove;
     private final AtomicBoolean splashReady = new AtomicBoolean(false);
+    private long splashStartTime;
     public Dialog getVisibleDialog() {
         for (int i = visibleDialogs.size() - 1; i >= 0; --i) {
             Dialog dialog = visibleDialogs.get(i);
@@ -381,27 +382,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         isActive = true;
+        splashStartTime = SystemClock.uptimeMillis();
         final SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
-        splashScreen.setKeepOnScreenCondition(() -> !splashReady.get());
-        splashScreen.setOnExitAnimationListener(splashScreenViewProvider -> {
-            View splashView = splashScreenViewProvider.getView();
-            View iconView = splashScreenViewProvider.getIconView();
-            if (iconView != null) {
-                iconView.setPivotX(iconView.getWidth() * 0.5f);
-                iconView.setPivotY(iconView.getHeight() * 0.5f);
-                iconView.animate()
-                        .rotationBy(360f)
-                        .scaleX(1.2f)
-                        .scaleY(1.2f)
-                        .setDuration(520L)
-                        .start();
-            }
-            splashView.animate()
-                    .alpha(0f)
-                    .setDuration(260L)
-                    .withEndAction(splashScreenViewProvider::remove)
-                    .start();
-        });
+        splashScreen.setKeepOnScreenCondition(() -> !splashReady.get() || SystemClock.uptimeMillis() - splashStartTime < 850L);
         if (BuildVars.DEBUG_VERSION) {
             StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
                 .detectLeakedClosableObjects()

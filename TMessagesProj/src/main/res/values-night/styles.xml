@@ -11,7 +11,7 @@
 
     <!--THEMES-->
 
-    <style name="Theme.TMessages.Start" parent="Theme.SplashScreen.IconBackground">
+    <style name="Theme.TMessages.Start" parent="Theme.SplashScreen">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:actionBarStyle">@style/ActionBar.Transparent.TMessages.Start</item>
@@ -22,8 +22,8 @@
         <item name="android:colorPrimary">#232d3a</item>
         <item name="android:navigationBarColor">#000000</item>
         <item name="android:forceDarkAllowed">false</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/transparent</item>
-        <item name="android:windowSplashScreenAnimationDuration">@integer/splash_screen_duration</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/axogram_splash_logo_dark</item>
+        <item name="android:windowSplashScreenAnimationDuration">900</item>
         <item name="android:windowSplashScreenBackground">@android:color/black</item>
         <item name="postSplashScreenTheme">@style/Theme.TMessages.Dark</item>
     </style>
