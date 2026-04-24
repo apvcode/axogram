@@ -787,7 +787,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
         switch (item.id) {
             case 0:
-                Toast.makeText(getParentActivity(), "Welcome to AxoGram!", Toast.LENGTH_SHORT).show();
+                presentFragment(new AxoGramEmptyFragment());
                 break;
             case 1:
                 presentFragment(new UserInfoActivity());
