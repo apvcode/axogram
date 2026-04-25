@@ -20,12 +20,15 @@ import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.database.DataSetObserver;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -771,12 +774,19 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             Bitmap bm = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
             Canvas c = new Canvas(bm);
             int backgroundColor = Theme.getColor(Theme.key_windowBackgroundWhite);
-            int logoColor = ColorUtils.calculateLuminance(backgroundColor) < 0.5f ? Color.WHITE : Color.BLACK;
-            Drawable drawable = getParentActivity().getResources().getDrawable(R.drawable.axogram_splash_logo_light).mutate();
-            drawable.setColorFilter(new PorterDuffColorFilter(logoColor, PorterDuff.Mode.SRC_IN));
-            int bleed = dp(44);
-            drawable.setBounds(-bleed, -bleed, size + bleed, size + bleed);
-            drawable.draw(c);
+            boolean darkBackground = ColorUtils.calculateLuminance(backgroundColor) < 0.5f;
+            Bitmap source = BitmapFactory.decodeResource(
+                    getParentActivity().getResources(),
+                    R.drawable.intro_axogram_logo_outline
+            );
+            if (source != null) {
+                Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+                paint.setColorFilter(new PorterDuffColorFilter(darkBackground ? Color.WHITE : Color.BLACK, PorterDuff.Mode.SRC_IN));
+                float inset = dp(16);
+                Rect srcRect = calculateOpaqueSquareBounds(source);
+                c.drawBitmap(source, srcRect, new RectF(inset, inset, size - inset, size - inset), paint);
+                source.recycle();
+            }
             return bm;
         };
         private final GenericProvider<Void, Bitmap> transparentTelegramSphereProvider = v -> {
@@ -787,6 +797,72 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         public EGLThread(SurfaceTexture surface) {
             super("EGLThread");
             surfaceTexture = surface;
+        }
+
+        private Rect calculateOpaqueSquareBounds(Bitmap source) {
+            int width = source.getWidth();
+            int height = source.getHeight();
+            int left = width;
+            int top = height;
+            int right = -1;
+            int bottom = -1;
+
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    if (((source.getPixel(x, y) >>> 24) & 0xFF) == 0) {
+                        continue;
+                    }
+                    if (x < left) {
+                        left = x;
+                    }
+                    if (x > right) {
+                        right = x;
+                    }
+                    if (y < top) {
+                        top = y;
+                    }
+                    if (y > bottom) {
+                        bottom = y;
+                    }
+                }
+            }
+
+            if (right < left || bottom < top) {
+                return new Rect(0, 0, width, height);
+            }
+
+            int contentWidth = right - left + 1;
+            int contentHeight = bottom - top + 1;
+            int squareSize = Math.max(contentWidth, contentHeight);
+            int centerX = (left + right) / 2;
+            int centerY = (top + bottom) / 2;
+
+            int squareLeft = centerX - squareSize / 2;
+            int squareTop = centerY - squareSize / 2;
+            int squareRight = squareLeft + squareSize;
+            int squareBottom = squareTop + squareSize;
+
+            if (squareLeft < 0) {
+                squareRight -= squareLeft;
+                squareLeft = 0;
+            }
+            if (squareTop < 0) {
+                squareBottom -= squareTop;
+                squareTop = 0;
+            }
+            if (squareRight > width) {
+                squareLeft -= squareRight - width;
+                squareRight = width;
+            }
+            if (squareBottom > height) {
+                squareTop -= squareBottom - height;
+                squareBottom = height;
+            }
+
+            squareLeft = Math.max(0, squareLeft);
+            squareTop = Math.max(0, squareTop);
+
+            return new Rect(squareLeft, squareTop, squareRight, squareBottom);
         }
 
         private boolean initGL() {
