@@ -384,9 +384,18 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                 return;
             }
             startPressed = true;
-
-            presentFragment(new LoginActivity().setIntroView(frameContainerView, startMessagingButton), true);
-            destroyed = true;
+            startMessagingButton.setEnabled(false);
+            startMessagingButton.animate()
+                    .scaleX(0.96f)
+                    .scaleY(0.96f)
+                    .translationY(-dp(4))
+                    .setDuration(110)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .withEndAction(() -> {
+                        presentFragment(new LoginActivity().setIntroView(frameContainerView, startMessagingButton), true);
+                        destroyed = true;
+                    })
+                    .start();
         });
 
         bottomPages = new BottomPagesView(context, viewPager, 6);
