@@ -271,6 +271,7 @@ public class ApplicationLoader extends Application {
             ContactsController.getInstance(a).checkAppAccount();
             DownloadController.getInstance(a);
         }
+        TeamBadgeController.getInstance().preload();
         BillingController.getInstance().startConnection();
     }
 

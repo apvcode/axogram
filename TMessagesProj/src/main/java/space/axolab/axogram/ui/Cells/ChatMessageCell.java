@@ -127,6 +127,7 @@ import space.axolab.axogram.R;
 import space.axolab.axogram.SendMessagesHelper;
 import space.axolab.axogram.SharedConfig;
 import space.axolab.axogram.SvgHelper;
+import space.axolab.axogram.TeamBadgeController;
 import space.axolab.axogram.TranslateController;
 import space.axolab.axogram.UserConfig;
 import space.axolab.axogram.UserObject;
@@ -1715,6 +1716,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     private Object currentNameStatus;
     private long currentNameBotVerificationId;
     private String nameStatusSlug;
+    private boolean currentNameHasTeamBadge;
+    private Drawable currentNameTeamBadgeDrawable;
+    private int currentNameTeamBadgeResId;
     public AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable currentNameStatusDrawable;
     public AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable currentNameEmojiStatusDrawable;
 
@@ -18599,6 +18603,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             if (drawTopic && topicButton != null) {
                 nameWidth -= topicButton.width + dp(8);
             }
+            currentNameHasTeamBadge = currentUser != null && TeamBadgeController.getInstance().hasBadge(currentUser.id);
+            if (currentNameHasTeamBadge) {
+                nameWidth -= getCurrentNameTeamBadgeWidth();
+            }
             int adminWidth = 0;
             boolean isAdmin = false, isOwner = false;
             SpannableStringBuilder adminString = null;
@@ -18718,6 +18726,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 }
                 if (currentNameBotVerificationId != 0) {
                     nameWidth += dp(4 + 12 + 4);
+                }
+                if (currentNameHasTeamBadge) {
+                    nameWidth += getCurrentNameTeamBadgeWidth();
                 }
                 nameWidth -= additionalWidth;
                 if (adminString != null) {
@@ -20899,11 +20910,16 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 currentNameEmojiStatusDrawable.setColor(ColorUtils.setAlphaComponent(color, 115));
                 currentNameEmojiStatusDrawable.draw(canvas);
             }
+            if (currentNameHasTeamBadge) {
+                float nameEnd = viaNameWidth > 0 ? viaNameWidth - dp(4 + 28) : nameLayoutWidth;
+                drawCurrentNameTeamBadge(canvas, Math.abs(nx) + nameEnd + dp(4), ny + nameLayout.getHeight() / 2f, 115f / 255f);
+            }
             if (currentNameStatusDrawable != null) {
+                int teamBadgeWidth = getCurrentNameTeamBadgeWidth();
                 currentNameStatusDrawable.setBounds(
-                    (int) (Math.abs(nx) + (viaNameWidth > 0 ? viaNameWidth - dp(4 + 28) : nameLayoutWidth) + dp(2)),
+                    (int) (Math.abs(nx) + (viaNameWidth > 0 ? viaNameWidth - dp(4 + 28) : nameLayoutWidth) + teamBadgeWidth + dp(2)),
                     (int) (ny + nameLayout.getHeight() / 2 - dp(10)),
-                    (int) (Math.abs(nx) + (viaNameWidth > 0 ? viaNameWidth - dp(4 + 28) : nameLayoutWidth) + dp(22)),
+                    (int) (Math.abs(nx) + (viaNameWidth > 0 ? viaNameWidth - dp(4 + 28) : nameLayoutWidth) + teamBadgeWidth + dp(22)),
                     (int) (ny + nameLayout.getHeight() / 2 + dp(10))
                 );
                 currentNameStatusDrawable.setColor(ColorUtils.setAlphaComponent(color, 115));
@@ -21551,6 +21567,42 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         return !TextUtils.equals(lastPostAuthor, currentMessageObject.messageOwner.post_author);
     }
 
+    private int getCurrentNameTeamBadgeWidth() {
+        return currentNameHasTeamBadge ? dp(18) : 0;
+    }
+
+    private Drawable getCurrentNameTeamBadgeDrawable() {
+        if (!currentNameHasTeamBadge) {
+            return null;
+        }
+        int resId = isDark() ? R.drawable.axo_lab_icon_white : R.drawable.axo_lab_icon_black;
+        if (currentNameTeamBadgeDrawable == null || currentNameTeamBadgeResId != resId) {
+            currentNameTeamBadgeResId = resId;
+            Drawable drawable = ContextCompat.getDrawable(getContext(), resId);
+            if (drawable != null) {
+                currentNameTeamBadgeDrawable = drawable.mutate();
+            }
+        }
+        return currentNameTeamBadgeDrawable;
+    }
+
+    private int getCurrentNameTeamBadgeColor() {
+        return Color.WHITE;
+    }
+
+    private void drawCurrentNameTeamBadge(Canvas canvas, float left, float centerY, float alpha) {
+        Drawable drawable = getCurrentNameTeamBadgeDrawable();
+        if (drawable == null) {
+            return;
+        }
+        int size = dp(14);
+        int top = (int) (centerY - size / 2f);
+        drawable.setBounds((int) left, top, (int) left + size, top + size);
+        drawable.setColorFilter(null);
+        drawable.setAlpha((int) (0xFF * alpha));
+        drawable.draw(canvas);
+    }
+
     public void drawNamesLayout(Canvas canvas, float alpha) {
         long newAnimationTime = SystemClock.elapsedRealtime();
         long dt = newAnimationTime - lastNamesAnimationTime;
@@ -21727,6 +21779,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
 
             if (!currentMessageObject.isSponsored()) {
+                float nameEnd = viaNameWidth > 0 ? viaNameWidth - dp(4 + 28) : nameLayoutWidth;
+                int teamBadgeWidth = getCurrentNameTeamBadgeWidth();
                 int selectorColor = Theme.multAlpha(Theme.chat_namePaint.getColor(), .12f);
                 if (nameLayoutSelector == null) {
                     nameLayoutSelector = Theme.createRadSelectorDrawable(nameLayoutSelectorColor = selectorColor, 6, 6);
@@ -21755,9 +21809,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     float starVerticalOffset = isStarDrawable ? 1.5f : 0f;
                     float starHorizontalOffset = isStarDrawable ? -5 : 0;
                     nameStatusSelector.setBounds(
-                        (int) (nx + nameOffsetX + (viaNameWidth > 0 ? viaNameWidth - dp(4 + 28) : nameLayoutWidth)),
+                        (int) (nx + nameOffsetX + nameEnd + teamBadgeWidth),
                         (int) (ny - dp(1.33f + 2 - starVerticalOffset)),
-                        (int) (nx + nameOffsetX + (viaNameWidth > 0 ? viaNameWidth - dp(4 + 28) : nameLayoutWidth) + dp(4 + 12 + 4 + 4 + starHorizontalOffset)),
+                        (int) (nx + nameOffsetX + nameEnd + teamBadgeWidth + dp(4 + 12 + 4 + 4 + starHorizontalOffset)),
                         (int) (ny + nameLayout.getHeight() + dp(1.33f + 2 - starVerticalOffset))
                     );
                     nameStatusSelector.setAlpha((int) (0xFF * nameAlpha));
@@ -21771,6 +21825,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             nameLayout.draw(canvas);
             Theme.chat_namePaint.setAlpha(oldAlpha);
             canvas.restore();
+            if (currentNameHasTeamBadge) {
+                float nameEnd = viaNameWidth > 0 ? viaNameWidth - dp(4 + 28) : nameLayoutWidth;
+                drawCurrentNameTeamBadge(canvas, nx + nameOffsetX + nameEnd + dp(4), ny + nameLayout.getHeight() / 2f, nameAlpha);
+            }
 
             float end;
             if (currentMessagesGroup != null && !currentMessagesGroup.isDocuments) {

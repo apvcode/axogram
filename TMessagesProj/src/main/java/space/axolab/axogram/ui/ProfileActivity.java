@@ -157,6 +157,7 @@ import space.axolab.axogram.R;
 import space.axolab.axogram.SendMessagesHelper;
 import space.axolab.axogram.SharedConfig;
 import space.axolab.axogram.SvgHelper;
+import space.axolab.axogram.TeamBadgeController;
 import space.axolab.axogram.UserConfig;
 import space.axolab.axogram.UserObject;
 import space.axolab.axogram.Utilities;
@@ -356,6 +357,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private AnimatorSet writeButtonAnimation;
     private Drawable lockIconDrawable;
     private final Drawable[] verifiedDrawable = new Drawable[2];
+    private final Drawable[] teamBadgeDrawable = new Drawable[2];
+    private final int[] teamBadgeDrawableResId = new int[2];
     private final Drawable[] premiumStarDrawable = new Drawable[2];
     private Long emojiStatusGiftId;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[] emojiStatusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[2];
@@ -7641,6 +7644,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 color2 = getThemedColor(Theme.key_player_actionBarTitle);
                 verifiedDrawable[1].setColorFilter(AndroidUtilities.getOffsetColor(color1, color2, value, 1.0f), PorterDuff.Mode.MULTIPLY);
             }
+            if (teamBadgeDrawable[0] != null) {
+                teamBadgeDrawable[0].setColorFilter(null);
+            }
+            if (teamBadgeDrawable[1] != null) {
+                teamBadgeDrawable[1].setColorFilter(null);
+            }
 
             if (verifiedCheckDrawable[0] != null) {
                 color1 = getThemedColor(Theme.key_profile_verifiedCheck);
@@ -10889,6 +10898,45 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return premiumCrossfadeDrawable[a];
     }
 
+    private Drawable getTeamBadgeDrawable(int a) {
+        int resId = Theme.isCurrentThemeDark() ? R.drawable.axo_lab_icon_white : R.drawable.axo_lab_icon_black;
+        if (teamBadgeDrawable[a] == null || teamBadgeDrawableResId[a] != resId) {
+            teamBadgeDrawableResId[a] = resId;
+            Drawable drawable = ContextCompat.getDrawable(getParentActivity(), resId);
+            if (drawable != null) {
+                CombinedDrawable combinedDrawable = new CombinedDrawable(new ColorDrawable(Color.TRANSPARENT), drawable.mutate());
+                combinedDrawable.setCustomSize(AndroidUtilities.dp(18), AndroidUtilities.dp(18));
+                combinedDrawable.setIconSize(AndroidUtilities.dp(16), AndroidUtilities.dp(16));
+                teamBadgeDrawable[a] = combinedDrawable;
+            }
+        }
+        if (teamBadgeDrawable[a] != null) {
+            teamBadgeDrawable[a].setColorFilter(null);
+        }
+        return teamBadgeDrawable[a];
+    }
+
+    private void applyTeamBadgeToNameTextView(SimpleTextView textView, int index, boolean hasBadge) {
+        if (!hasBadge) {
+            return;
+        }
+        Drawable badgeDrawable = getTeamBadgeDrawable(index);
+        if (badgeDrawable == null) {
+            return;
+        }
+        if (textView.getRightDrawable2() == null) {
+            textView.setRightDrawable2(badgeDrawable);
+            if (index == 0) {
+                nameTextViewRightDrawable2ContentDescription = "AxoGram Team";
+            }
+        } else if (textView.getRightDrawable() == null) {
+            textView.setRightDrawable(badgeDrawable);
+            if (index == 0) {
+                nameTextViewRightDrawableContentDescription = "AxoGram Team";
+            }
+        }
+    }
+
     private Drawable getBotVerificationDrawable(long icon, boolean animated, int a) {
         if (botVerificationDrawable[a] == null) {
             botVerificationDrawable[a] = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(nameTextView[a], AndroidUtilities.dp(17), a == 0 ? AnimatedEmojiDrawable.CACHE_TYPE_EMOJI_STATUS : AnimatedEmojiDrawable.CACHE_TYPE_KEYBOARD);
@@ -11231,6 +11279,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 } : null);
                 Drawable leftIcon = currentEncryptedChat != null ? getLockIconDrawable() : null;
                 boolean rightIconIsPremium = false, rightIconIsStatus = false;
+                boolean hasTeamBadge = TeamBadgeController.getInstance().hasBadge(user.id);
                 nameTextView[a].setRightDrawableOutside(a == 0);
                 if (a == 0 && !copyFromChatActivity) {
                     if (user.scam || user.fake) {
@@ -11260,6 +11309,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         nameTextView[a].setRightDrawable(null);
                         nameTextViewRightDrawableContentDescription = null;
                     }
+                    applyTeamBadgeToNameTextView(nameTextView[a], a, hasTeamBadge);
                 } else if (a == 1) {
                     if (user.scam || user.fake) {
                         nameTextView[a].setRightDrawable2(getScamDrawable(user.scam ? 0 : 1));
@@ -11279,6 +11329,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     } else {
                         nameTextView[a].setRightDrawable(null);
                     }
+                    applyTeamBadgeToNameTextView(nameTextView[a], a, hasTeamBadge);
                 }
                 if (leftIcon == null && currentEncryptedChat == null && user.bot_verification_icon != 0) {
                     nameTextView[a].setLeftDrawableOutside(true);

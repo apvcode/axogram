@@ -81,6 +81,7 @@ import space.axolab.axogram.MessagesStorage;
 import space.axolab.axogram.NotificationCenter;
 import space.axolab.axogram.R;
 import space.axolab.axogram.SharedConfig;
+import space.axolab.axogram.TeamBadgeController;
 import space.axolab.axogram.UserConfig;
 import space.axolab.axogram.UserObject;
 import space.axolab.axogram.Utilities;
@@ -589,9 +590,12 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private boolean drawVerified;
     private boolean drawBotVerified;
     private boolean drawPremium;
+    private boolean drawTeamBadge;
     private final View emojiStatusView;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerification;
+    private Drawable teamBadgeDrawable;
+    private int teamBadgeDrawableResId;
 
     private int drawScam;
 
@@ -669,6 +673,37 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         emojiStatus = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(emojiStatusView, dp(22));
         botVerification = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, dp(17));
         avatarImage.setAllowLoadingOnAttachedOnly(true);
+    }
+
+    private int getTeamBadgeSize() {
+        return dp(15);
+    }
+
+    private int getTeamBadgeWidthWithPadding() {
+        return dp(6) + getTeamBadgeSize();
+    }
+
+    private Drawable getDialogTeamBadgeDrawable() {
+        int resId = Theme.isCurrentThemeDark() ? R.drawable.axo_lab_icon_white : R.drawable.axo_lab_icon_black;
+        if (teamBadgeDrawable == null || teamBadgeDrawableResId != resId) {
+            teamBadgeDrawableResId = resId;
+            Drawable drawable = ContextCompat.getDrawable(getContext(), resId);
+            if (drawable != null) {
+                teamBadgeDrawable = drawable.mutate();
+            }
+        }
+        return teamBadgeDrawable;
+    }
+
+    private void drawDialogTeamBadge(Canvas canvas, float left, float top) {
+        Drawable drawable = getDialogTeamBadgeDrawable();
+        if (drawable == null) {
+            return;
+        }
+        int size = getTeamBadgeSize();
+        drawable.setBounds((int) left, (int) top, (int) left + size, (int) top + size);
+        drawable.setColorFilter(null);
+        drawable.draw(canvas);
     }
 
     @Override
@@ -1183,6 +1218,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         drawVerified = false;
         drawBotVerified = false;
         drawPremium = false;
+        drawTeamBadge = false;
         drawForwardIcon = false;
         drawGiftIcon = false;
         drawScam = 0;
@@ -1394,6 +1430,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                             drawScam = 2;
                             Theme.dialogs_fakeDrawable.checkText();
                         } else {
+                            drawTeamBadge = TeamBadgeController.getInstance().hasBadge(user.id);
                             drawVerified = !forbidVerified && user.verified;
                             drawBotVerified = !forbidVerified && !UserObject.isUserSelf(user) && user.bot_verification_icon != 0;
                         }
@@ -2199,7 +2236,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         }
 
         nameAdditionalsForChannelSubscriber = 0;
-        if (drawPremium && emojiStatus.getDrawable() != null) {
+        if (drawTeamBadge) {
+            int w = getTeamBadgeWidthWithPadding();
+            nameWidth -= w;
+            nameAdditionalsForChannelSubscriber += w;
+            if (LocaleController.isRTL) {
+                nameLeft += w;
+            }
+        } else if (drawPremium && emojiStatus.getDrawable() != null) {
             int w = dp(6 + 24 + 6);
             nameWidth -= w;
             nameAdditionalsForChannelSubscriber += w;
@@ -2651,7 +2695,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if (nameLayoutEllipsizeByGradient) {
                     widthpx = Math.min(nameWidth, widthpx);
                 }
-                if ((dialogMuted || drawUnmute) && !drawVerified && drawScam == 0) {
+                if (drawTeamBadge) {
+                    nameMuteLeft = (int) (nameLeft + (nameWidth - widthpx) - dp(6) - getTeamBadgeSize());
+                } else if ((dialogMuted || drawUnmute) && !drawVerified && drawScam == 0) {
                     nameMuteLeft = (int) (nameLeft + (nameWidth - widthpx) - dp(6) - Theme.dialogs_muteDrawable.getIntrinsicWidth());
                 } else if (drawVerified) {
                     nameMuteLeft = (int) (nameLeft + (nameWidth - widthpx) - dp(6) - Theme.dialogs_verifiedDrawable.getIntrinsicWidth());
@@ -2745,7 +2791,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if (drawBotVerified) {
                     nameLeft += dp(21);
                 }
-                if ((dialogMuted || true) || drawUnmute || drawVerified || drawPremium || drawScam != 0) {
+                if ((dialogMuted || true) || drawUnmute || drawVerified || drawPremium || drawScam != 0 || drawTeamBadge) {
                     nameMuteLeft = (int) (nameLeft + left + dp(6));
                 }
             }
@@ -4221,7 +4267,13 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 }
             }
             boolean drawMuted = drawUnmute || dialogMuted;
-            if (dialogsType != 2 && (drawMuted || dialogMutedProgress > 0) && !drawVerified && drawScam == 0 && !drawPremium) {
+            if (drawTeamBadge) {
+                float y = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 13.5f : 16f);
+                if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
+                    y -= dp(9);
+                }
+                drawDialogTeamBadge(canvas, nameMuteLeft - dp(1), y);
+            } else if (dialogsType != 2 && (drawMuted || dialogMutedProgress > 0) && !drawVerified && drawScam == 0 && !drawPremium) {
                 if (drawMuted && dialogMutedProgress != 1f) {
                     dialogMutedProgress += 16 / 150f;
                     if (dialogMutedProgress > 1f) {
