@@ -23,12 +23,15 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.SurfaceTexture;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -40,6 +43,7 @@ import android.os.Parcelable;
 import android.util.TypedValue;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -130,6 +134,9 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
     private boolean isOnLogout;
     private boolean introAnimationPlayed;
+    private final Paint startMessagingButtonPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+    private final Matrix startMessagingButtonMatrix = new Matrix();
+    private LinearGradient startMessagingButtonShader;
 
     @Override
     public boolean onFragmentCreate() {
@@ -346,11 +353,28 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                 startMessagingButtonBackground.setBounds(0, 0, w, h);
                 startMessagingButtonBackground.setCornerRadius(Math.min(w, h) / 2f);
                 cellFlickerDrawable.setParentWidth(w);
+                startMessagingButtonShader = new LinearGradient(
+                        0, 0, w, 0,
+                        new int[] {
+                                ColorUtils.blendARGB(Theme.getColor(Theme.key_featuredStickers_addButton), Color.WHITE, 0.08f),
+                                ColorUtils.blendARGB(Theme.getColor(Theme.key_featuredStickers_addButton), Theme.getColor(Theme.key_featuredStickers_addButton2), 0.65f),
+                                ColorUtils.blendARGB(Theme.getColor(Theme.key_featuredStickers_addButton2), Color.WHITE, 0.12f)
+                        },
+                        new float[] {0f, 0.48f, 1f},
+                        Shader.TileMode.CLAMP
+                );
+                startMessagingButtonPaint.setShader(startMessagingButtonShader);
             }
 
             @Override
             public void draw(@NonNull Canvas canvas) {
-                startMessagingButtonBackground.draw(canvas);
+                if (startMessagingButtonShader != null) {
+                    float time = (System.currentTimeMillis() % 2200L) / 2200f;
+                    startMessagingButtonMatrix.reset();
+                    startMessagingButtonMatrix.setTranslate((time - 0.5f) * getMeasuredWidth() * 0.95f, 0);
+                    startMessagingButtonShader.setLocalMatrix(startMessagingButtonMatrix);
+                }
+                canvas.drawRoundRect(0, 0, getMeasuredWidth(), getMeasuredHeight(), getMeasuredHeight() / 2f, getMeasuredHeight() / 2f, startMessagingButtonPaint);
                 super.draw(canvas);
             }
 
@@ -384,12 +408,13 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                 return;
             }
             startPressed = true;
+            startMessagingButton.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
             startMessagingButton.setEnabled(false);
+            startMessagingButton.animate().cancel();
             startMessagingButton.animate()
-                    .scaleX(0.96f)
-                    .scaleY(0.96f)
-                    .translationY(-dp(4))
-                    .setDuration(110)
+                    .scaleX(0.97f)
+                    .scaleY(0.97f)
+                    .setDuration(85)
                     .setInterpolator(new DecelerateInterpolator())
                     .withEndAction(() -> {
                         presentFragment(new LoginActivity().setIntroView(frameContainerView, startMessagingButton), true);
@@ -593,9 +618,9 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         messageTextView.setTranslationY(dp(18));
 
         startMessagingButton.setAlpha(0f);
-        startMessagingButton.setTranslationY(dp(20));
-        startMessagingButton.setScaleX(0.96f);
-        startMessagingButton.setScaleY(0.96f);
+        startMessagingButton.setTranslationY(dp(28));
+        startMessagingButton.setScaleX(0.76f);
+        startMessagingButton.setScaleY(1.18f);
 
         switchLanguageTextView.setAlpha(0f);
         switchLanguageTextView.setTranslationY(dp(12));
@@ -624,8 +649,8 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                 .scaleX(1f)
                 .scaleY(1f)
                 .setStartDelay(220)
-                .setDuration(480)
-                .setInterpolator(new OvershootInterpolator(0.7f))
+                .setDuration(760)
+                .setInterpolator(new OvershootInterpolator(1.05f))
                 .start();
 
         switchLanguageTextView.animate()
