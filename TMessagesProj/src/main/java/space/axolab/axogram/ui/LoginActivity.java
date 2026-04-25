@@ -359,6 +359,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
     private ImageView proxyButtonView;
     private ProxyDrawable proxyDrawable;
+    private TextView topBrandTextView;
 
     // Open animation stuff
     private LinearLayout keyboardLinearLayout;
@@ -589,6 +590,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     marginLayoutParams.topMargin = AndroidUtilities.dp(16) + statusBarHeight;
                 }
 
+                if (topBrandTextView != null) {
+                    marginLayoutParams = (MarginLayoutParams) topBrandTextView.getLayoutParams();
+                    marginLayoutParams.topMargin = AndroidUtilities.dp(18) + statusBarHeight;
+                }
+
                 if (measureKeyboardHeight() > AndroidUtilities.dp(20) && keyboardView.getVisibility() != GONE && !isCustomKeyboardForceDisabled() && !customKeyboardWasVisible) {
                     if (keyboardAnimator != null) {
                         keyboardAnimator.cancel();
@@ -761,6 +767,15 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 finishFragment();
             });
         }
+
+        topBrandTextView = new TextView(context);
+        topBrandTextView.setText("AxoGram");
+        topBrandTextView.setGravity(Gravity.CENTER);
+        topBrandTextView.setTypeface(AndroidUtilities.bold());
+        topBrandTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 22);
+        topBrandTextView.setAlpha(currentViewNum == VIEW_PHONE_INPUT ? 1f : 0f);
+        topBrandTextView.setVisibility(currentViewNum == VIEW_PHONE_INPUT ? View.VISIBLE : View.GONE);
+        sizeNotifierFrameLayout.addView(topBrandTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 24, 18, 24, 0));
 
         proxyButtonView = new ImageView(context);
         proxyButtonView.setImageDrawable(proxyDrawable = new ProxyDrawable(context));
@@ -1528,6 +1543,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         if (animated) {
             final SlideView outView = views[currentViewNum];
             final SlideView newView = views[page];
+            final boolean showTopBrand = page == VIEW_PHONE_INPUT;
             currentViewNum = page;
             backButtonView.setVisibility(newView.needBackButton() || newAccount ? View.VISIBLE : View.GONE);
 
@@ -1540,6 +1556,13 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             AnimatorSet pagesAnimation = new AnimatorSet();
             pagesAnimation.addListener(new AnimatorListenerAdapter() {
                 @Override
+                public void onAnimationStart(Animator animation) {
+                    if (topBrandTextView != null && showTopBrand) {
+                        topBrandTextView.setVisibility(View.VISIBLE);
+                    }
+                }
+
+                @Override
                 public void onAnimationEnd(Animator animation) {
                     if (currentDoneType == DONE_TYPE_FLOATING && needFloatingButton) {
                         showDoneButton(true, true);
@@ -1547,11 +1570,22 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     outView.setVisibility(View.GONE);
                     outView.onHide();
                     outView.setX(0);
+                    if (topBrandTextView != null && !showTopBrand) {
+                        topBrandTextView.setVisibility(View.GONE);
+                    }
                 }
             });
-            pagesAnimation.playTogether(
-                    ObjectAnimator.ofFloat(outView, View.TRANSLATION_X, back ? AndroidUtilities.displaySize.x : -AndroidUtilities.displaySize.x),
-                    ObjectAnimator.ofFloat(newView, View.TRANSLATION_X, 0));
+            ArrayList<Animator> animators = new ArrayList<>();
+            animators.add(ObjectAnimator.ofFloat(outView, View.TRANSLATION_X, back ? AndroidUtilities.displaySize.x : -AndroidUtilities.displaySize.x));
+            animators.add(ObjectAnimator.ofFloat(newView, View.TRANSLATION_X, 0));
+            if (topBrandTextView != null) {
+                if (showTopBrand) {
+                    topBrandTextView.setTranslationY(AndroidUtilities.dp(8));
+                }
+                animators.add(ObjectAnimator.ofFloat(topBrandTextView, View.ALPHA, showTopBrand ? 1f : 0f));
+                animators.add(ObjectAnimator.ofFloat(topBrandTextView, View.TRANSLATION_Y, showTopBrand ? 0f : -AndroidUtilities.dp(8)));
+            }
+            pagesAnimation.playTogether(animators);
             pagesAnimation.setDuration(300);
             pagesAnimation.setInterpolator(new AccelerateDecelerateInterpolator());
             pagesAnimation.start();
@@ -1566,6 +1600,12 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             views[page].setVisibility(View.VISIBLE);
             setParentActivityTitle(views[page].getHeaderName());
             views[page].onShow();
+            if (topBrandTextView != null) {
+                boolean showTopBrand = page == VIEW_PHONE_INPUT;
+                topBrandTextView.setVisibility(showTopBrand ? View.VISIBLE : View.GONE);
+                topBrandTextView.setAlpha(showTopBrand ? 1f : 0f);
+                topBrandTextView.setTranslationY(0f);
+            }
 
             setCustomKeyboardVisible(views[page].hasCustomKeyboard(), false);
         }
@@ -8365,27 +8405,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 ((View) fragmentView.getParent()).setTranslationX(0);
             }
 
-            TransformableLoginButtonView transformButton = new TransformableLoginButtonView(fragmentView.getContext());
-            transformButton.setButtonText(startMessagingButton.getPaint(), startMessagingButton.getText().toString());
-
-            int oldTransformWidth = startMessagingButton.getWidth(), oldTransformHeight = startMessagingButton.getHeight();
-            int newTransformSize = floatingButtonIcon.getLayoutParams().width;
-            ViewGroup.MarginLayoutParams transformParams = new FrameLayout.LayoutParams(oldTransformWidth, oldTransformHeight);
-            transformButton.setLayoutParams(transformParams);
-
-            int[] loc = new int[2];
-            fragmentView.getLocationInWindow(loc);
-            int fragmentX = loc[0], fragmentY = loc[1];
-
-            startMessagingButton.getLocationInWindow(loc);
-            float fromX = loc[0] - fragmentX, fromY = loc[1] - fragmentY;
-            transformButton.setTranslationX(fromX);
-            transformButton.setTranslationY(fromY);
-
-            int toX = getParentLayout().getView().getWidth() - floatingButtonIcon.getLayoutParams().width - dp(20) - getParentLayout().getView().getPaddingLeft() - getParentLayout().getView().getPaddingRight(),
-                    toY = getParentLayout().getView().getHeight() - floatingButtonIcon.getLayoutParams().height - dp(14) -
-                            (isCustomKeyboardVisible() ? AndroidUtilities.dp(CustomPhoneKeyboardView.KEYBOARD_HEIGHT_DP) : 0) - getParentLayout().getView().getPaddingTop() - getParentLayout().getView().getPaddingBottom();
-
             ValueAnimator animator = ValueAnimator.ofFloat(0, 1);
             animator.addListener(new AnimatorListenerAdapter() {
                 @Override
@@ -8394,9 +8413,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     keyboardLinearLayout.setAlpha(0);
                     fragmentView.setBackgroundColor(Color.TRANSPARENT);
                     startMessagingButton.setVisibility(View.INVISIBLE);
-
-                    FrameLayout frameLayout = (FrameLayout) fragmentView;
-                    frameLayout.addView(transformButton);
                 }
 
                 @Override
@@ -8405,9 +8421,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     startMessagingButton.setVisibility(View.VISIBLE);
                     fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     floatingButton.setButtonVisible(true, false);
-
-                    FrameLayout frameLayout = (FrameLayout) fragmentView;
-                    frameLayout.removeView(transformButton);
 
                     if (animationFinishCallback != null) {
                         AndroidUtilities.runOnUIThread(animationFinishCallback);
@@ -8422,33 +8435,32 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             int initialAlpha = Color.alpha(bgColor);
             animator.addUpdateListener(animation -> {
                 float val = (float) animation.getAnimatedValue();
-                keyboardLinearLayout.setAlpha(val);
                 fragmentView.setBackgroundColor(ColorUtils.setAlphaComponent(bgColor, (int) (initialAlpha * val)));
 
                 float inverted = 1f - val;
-                slideViewsContainer.setTranslationY(AndroidUtilities.dp(20) * inverted);
+                float loginReveal = Math.max(0f, (val - 0.12f) / 0.88f);
+                keyboardLinearLayout.setAlpha(loginReveal);
+
+                slideViewsContainer.setTranslationY(AndroidUtilities.dp(56) * (1f - loginReveal));
+                slideViewsContainer.setAlpha(loginReveal);
+                float slideScale = 0.965f + 0.035f * loginReveal;
+                slideViewsContainer.setScaleX(slideScale);
+                slideViewsContainer.setScaleY(slideScale);
                 if (!isCustomKeyboardForceDisabled()) {
-                    keyboardView.setTranslationY(keyboardView.getLayoutParams().height * inverted);
-                    floatingButton.setTranslationY(keyboardView.getLayoutParams().height * inverted);
+                    keyboardView.setTranslationY(keyboardView.getLayoutParams().height * (1f - loginReveal));
+                    floatingButton.setTranslationY(keyboardView.getLayoutParams().height * (1f - loginReveal));
                 }
 
-                introView.setTranslationY(-AndroidUtilities.dp(20) * val);
-                float sc = 0.95f + 0.05f * inverted;
+                introView.setTranslationY(-AndroidUtilities.dp(18) * val);
+                introView.setAlpha(1f - val * 0.72f);
+                float sc = 1f - 0.02f * val;
                 introView.setScaleX(sc);
                 introView.setScaleY(sc);
-
-                transformParams.width = (int) (oldTransformWidth + (newTransformSize - oldTransformWidth) * val);
-                transformParams.height = (int) (oldTransformHeight + (newTransformSize - oldTransformHeight) * val);
-                transformButton.requestLayout();
-
-                transformButton.setProgress(val);
-                transformButton.setTranslationX(fromX + (toX - fromX) * val);
-                transformButton.setTranslationY(fromY + (toY - fromY) * val);
             });
-            animator.setInterpolator(CubicBezierInterpolator.DEFAULT);
+            animator.setInterpolator(CubicBezierInterpolator.EASE_OUT);
 
             AnimatorSet set = new AnimatorSet();
-            set.setDuration(300);
+            set.setDuration(680);
             set.playTogether(animator);
             set.start();
             return set;
@@ -8458,6 +8470,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
     private void updateColors() {
         fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+
+        if (topBrandTextView != null) {
+            topBrandTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        }
 
         backButtonView.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         backButtonView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector)));

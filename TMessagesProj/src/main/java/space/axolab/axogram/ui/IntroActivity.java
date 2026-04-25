@@ -410,17 +410,8 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             startPressed = true;
             startMessagingButton.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
             startMessagingButton.setEnabled(false);
-            startMessagingButton.animate().cancel();
-            startMessagingButton.animate()
-                    .scaleX(0.97f)
-                    .scaleY(0.97f)
-                    .setDuration(85)
-                    .setInterpolator(new DecelerateInterpolator())
-                    .withEndAction(() -> {
-                        presentFragment(new LoginActivity().setIntroView(frameContainerView, startMessagingButton), true);
-                        destroyed = true;
-                    })
-                    .start();
+            presentFragment(new LoginActivity().setIntroView(frameContainerView, startMessagingButton), true);
+            destroyed = true;
         });
 
         bottomPages = new BottomPagesView(context, viewPager, 6);
