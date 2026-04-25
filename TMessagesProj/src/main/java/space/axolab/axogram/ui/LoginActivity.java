@@ -1307,6 +1307,26 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             showDoneAnimation[currentDoneType] = new AnimatorSet();
             if (floating) {
                 floatingButton.setButtonVisible(show, animated);
+                floatingButton.animate().cancel();
+                if (show) {
+                    floatingButton.setAlpha(0f);
+                    floatingButton.setScaleX(0.82f);
+                    floatingButton.setScaleY(0.82f);
+                    floatingButton.setTranslationY(AndroidUtilities.dp(20));
+                    showDoneAnimation[currentDoneType].playTogether(
+                            ObjectAnimator.ofFloat(floatingButton, View.ALPHA, 1f),
+                            ObjectAnimator.ofFloat(floatingButton, View.SCALE_X, 1f),
+                            ObjectAnimator.ofFloat(floatingButton, View.SCALE_Y, 1f),
+                            ObjectAnimator.ofFloat(floatingButton, View.TRANSLATION_Y, 0f)
+                    );
+                } else {
+                    showDoneAnimation[currentDoneType].playTogether(
+                            ObjectAnimator.ofFloat(floatingButton, View.ALPHA, 0f),
+                            ObjectAnimator.ofFloat(floatingButton, View.SCALE_X, 0.9f),
+                            ObjectAnimator.ofFloat(floatingButton, View.SCALE_Y, 0.9f),
+                            ObjectAnimator.ofFloat(floatingButton, View.TRANSLATION_Y, AndroidUtilities.dp(10))
+                    );
+                }
             }
             showDoneAnimation[currentDoneType].addListener(new AnimatorListenerAdapter() {
                 @Override
@@ -1319,7 +1339,18 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                                 floatingButtonIcon.setScaleY(1f);
                                 floatingButtonIcon.setVisibility(View.VISIBLE);
                             }
+                            if (floating) {
+                                floatingButton.setTranslationY(0f);
+                                floatingButton.setScaleX(1f);
+                                floatingButton.setScaleY(1f);
+                            }
+                        } else if (floating) {
+                            floatingButton.setAlpha(1f);
+                            floatingButton.setTranslationY(0f);
+                            floatingButton.setScaleX(1f);
+                            floatingButton.setScaleY(1f);
                         }
+                        showDoneAnimation[floating ? 0 : 1] = null;
                     }
                 }
 
@@ -1334,11 +1365,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             final Interpolator interpolator;
             if (floating) {
                 if (show) {
-                    duration = 200;
-                    interpolator = AndroidUtilities.decelerateInterpolator;
+                    duration = 320;
+                    interpolator = CubicBezierInterpolator.EASE_OUT_QUINT;
                 } else {
-                    duration = 150;
-                    interpolator = AndroidUtilities.accelerateInterpolator;
+                    duration = 180;
+                    interpolator = CubicBezierInterpolator.EASE_OUT;
                 }
             } else {
                 duration = 150;
@@ -8410,6 +8441,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 @Override
                 public void onAnimationStart(Animator animation) {
                     floatingButton.setButtonVisible(false, false);
+                    floatingButton.setAlpha(0f);
                     keyboardLinearLayout.setAlpha(0);
                     fragmentView.setBackgroundColor(Color.TRANSPARENT);
                     startMessagingButton.setVisibility(View.INVISIBLE);
@@ -8420,7 +8452,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     keyboardLinearLayout.setAlpha(1);
                     startMessagingButton.setVisibility(View.VISIBLE);
                     fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-                    floatingButton.setButtonVisible(true, false);
+                    floatingButton.setButtonVisible(true, true);
 
                     if (animationFinishCallback != null) {
                         AndroidUtilities.runOnUIThread(animationFinishCallback);
