@@ -385,6 +385,26 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         splashStartTime = SystemClock.uptimeMillis();
         final SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         splashScreen.setKeepOnScreenCondition(() -> !splashReady.get() || SystemClock.uptimeMillis() - splashStartTime < 850L);
+        splashScreen.setOnExitAnimationListener(splashScreenViewProvider -> {
+            View splashView = splashScreenViewProvider.getView();
+            View iconView = splashScreenViewProvider.getIconView();
+            if (iconView != null) {
+                iconView.setPivotX(iconView.getWidth() * 0.5f);
+                iconView.setPivotY(iconView.getHeight() * 0.5f);
+                iconView.animate()
+                        .rotationBy(360f)
+                        .scaleX(1.12f)
+                        .scaleY(1.12f)
+                        .setDuration(520L)
+                        .start();
+            }
+            splashView.animate()
+                    .alpha(0f)
+                    .setStartDelay(180L)
+                    .setDuration(220L)
+                    .withEndAction(splashScreenViewProvider::remove)
+                    .start();
+        });
         if (BuildVars.DEBUG_VERSION) {
             StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
                 .detectLeakedClosableObjects()
