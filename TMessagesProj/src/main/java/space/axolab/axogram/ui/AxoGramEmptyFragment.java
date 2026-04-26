@@ -11,6 +11,7 @@ import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -32,6 +33,7 @@ import java.util.Random;
 public class AxoGramEmptyFragment extends BaseFragment {
     private static final int ID_COLLAPSE_SETTINGS_TABS = 1;
     private static final String PREF_COLLAPSE_SETTINGS_TABS = "axogram_collapse_settings_tabs";
+    private ValueAnimator logoRotationAnimator;
 
     @Override
     public View createView(Context context) {
@@ -299,11 +301,17 @@ public class AxoGramEmptyFragment extends BaseFragment {
         topLogoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         topLogoView.setImageResource(R.drawable.axogram_logo_app_in_nobg);
         FrameLayout.LayoutParams topLogoLayoutParams = new FrameLayout.LayoutParams(
-                AndroidUtilities.dp(128),
-                AndroidUtilities.dp(128),
+                AndroidUtilities.dp(156),
+                AndroidUtilities.dp(156),
                 Gravity.CENTER
         );
         topLogoCard.addView(topLogoView, topLogoLayoutParams);
+        logoRotationAnimator = ValueAnimator.ofFloat(0f, 1f);
+        logoRotationAnimator.setDuration(2400);
+        logoRotationAnimator.setInterpolator(new LinearInterpolator());
+        logoRotationAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        logoRotationAnimator.addUpdateListener(animation -> topLogoView.setRotation(360f * (float) animation.getAnimatedValue()));
+        logoRotationAnimator.start();
 
         TextView heroTitleView = new TextView(context);
         heroTitleView.setText("AxoGram");
@@ -454,5 +462,14 @@ public class AxoGramEmptyFragment extends BaseFragment {
 
         fragmentView = contentView;
         return fragmentView;
+    }
+
+    @Override
+    public void onFragmentDestroy() {
+        if (logoRotationAnimator != null) {
+            logoRotationAnimator.cancel();
+            logoRotationAnimator = null;
+        }
+        super.onFragmentDestroy();
     }
 }
