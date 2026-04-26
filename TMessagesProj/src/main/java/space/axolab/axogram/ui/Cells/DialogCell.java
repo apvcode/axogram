@@ -82,6 +82,7 @@ import space.axolab.axogram.NotificationCenter;
 import space.axolab.axogram.R;
 import space.axolab.axogram.SharedConfig;
 import space.axolab.axogram.TeamBadgeController;
+import space.axolab.axogram.TeamBadgeDrawableHelper;
 import space.axolab.axogram.UserConfig;
 import space.axolab.axogram.UserObject;
 import space.axolab.axogram.Utilities;
@@ -676,7 +677,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     }
 
     private int getTeamBadgeSize() {
-        return dp(15);
+        return dp(18);
     }
 
     private int getTeamBadgeWidthWithPadding() {
@@ -687,10 +688,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         int resId = Theme.isCurrentThemeDark() ? R.drawable.axo_lab_icon_white : R.drawable.axo_lab_icon_black;
         if (teamBadgeDrawable == null || teamBadgeDrawableResId != resId) {
             teamBadgeDrawableResId = resId;
-            Drawable drawable = ContextCompat.getDrawable(getContext(), resId);
-            if (drawable != null) {
-                teamBadgeDrawable = drawable.mutate();
-            }
+            teamBadgeDrawable = TeamBadgeDrawableHelper.create(getContext(), Theme.isCurrentThemeDark(), 18, 18, 14, 6, 5);
         }
         return teamBadgeDrawable;
     }
@@ -704,6 +702,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         drawable.setBounds((int) left, (int) top, (int) left + size, (int) top + size);
         drawable.setColorFilter(null);
         drawable.draw(canvas);
+        invalidate();
     }
 
     @Override

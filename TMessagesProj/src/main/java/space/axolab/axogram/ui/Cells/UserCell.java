@@ -38,6 +38,8 @@ import space.axolab.axogram.LocaleController;
 import space.axolab.axogram.MessagesController;
 import space.axolab.axogram.NotificationCenter;
 import space.axolab.axogram.R;
+import space.axolab.axogram.TeamBadgeController;
+import space.axolab.axogram.TeamBadgeDrawableHelper;
 import space.axolab.axogram.UserConfig;
 import space.axolab.axogram.UserObject;
 import space.axolab.axogram.tgnet.ConnectionsManager;
@@ -71,6 +73,8 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
     private TextView adminTextView;
     private TextView addButton;
     private Drawable premiumDrawable;
+    private Drawable teamBadgeDrawable;
+    private int teamBadgeDrawableResId;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botVerification;
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
     private ImageView closeView;
@@ -91,6 +95,7 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
     private String lastName;
     private int lastStatus;
     private TLRPC.FileLocation lastAvatar;
+    private boolean lastHasTeamBadge;
 
     private int currentAccount = UserConfig.selectedAccount;
 
@@ -546,6 +551,12 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
                     continueUpdate = true;
                 }
             }
+            if (!continueUpdate && currentUser != null && (mask & MessagesController.UPDATE_MASK_NAME) != 0) {
+                boolean hasTeamBadge = TeamBadgeController.getInstance().hasBadge(currentUser.id);
+                if (hasTeamBadge != lastHasTeamBadge) {
+                    continueUpdate = true;
+                }
+            }
             if (!continueUpdate) {
                 return;
             }
@@ -647,7 +658,12 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
             botVerification.setColor(Theme.getColor(Theme.key_chats_verifiedBackground, resourcesProvider));
             nameTextView.setLeftDrawable(botVerification);
         }
-        if (currentUser != null && MessagesController.getInstance(currentAccount).isPremiumUser(currentUser) && !MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
+        boolean hasTeamBadge = currentUser != null && TeamBadgeController.getInstance().hasBadge(currentUser.id);
+        lastHasTeamBadge = hasTeamBadge;
+        if (hasTeamBadge) {
+            nameTextView.setRightDrawable(getTeamBadgeDrawable());
+            nameTextView.setRightDrawableTopPadding(0);
+        } else if (currentUser != null && MessagesController.getInstance(currentAccount).isPremiumUser(currentUser) && !MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
             if (DialogObject.getEmojiStatusDocumentId(currentUser.emoji_status) != 0) {
                 emojiStatus.set(DialogObject.getEmojiStatusDocumentId(currentUser.emoji_status), false);
                 emojiStatus.setColor(Theme.getColor(Theme.key_chats_verifiedBackground, resourcesProvider));
@@ -728,6 +744,16 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
         if (needDivider) {
             canvas.drawLine(LocaleController.isRTL ? 0 : dp(68), getMeasuredHeight() - 1, getMeasuredWidth() - (LocaleController.isRTL ? dp(68) : 0), getMeasuredHeight() - 1, Theme.dividerPaint);
         }
+    }
+
+    private Drawable getTeamBadgeDrawable() {
+        int badgeResId = Theme.isCurrentThemeDark() ? R.drawable.axo_lab_icon_white : R.drawable.axo_lab_icon_black;
+        if (teamBadgeDrawable == null || teamBadgeDrawableResId != badgeResId) {
+            teamBadgeDrawable = TeamBadgeDrawableHelper.create(getContext(), Theme.isCurrentThemeDark(), 20, 20, 15, 7, 5);
+            teamBadgeDrawableResId = badgeResId;
+        }
+        teamBadgeDrawable.setColorFilter(null);
+        return teamBadgeDrawable;
     }
 
     @Override

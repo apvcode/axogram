@@ -158,6 +158,7 @@ import space.axolab.axogram.SendMessagesHelper;
 import space.axolab.axogram.SharedConfig;
 import space.axolab.axogram.SvgHelper;
 import space.axolab.axogram.TeamBadgeController;
+import space.axolab.axogram.TeamBadgeDrawableHelper;
 import space.axolab.axogram.UserConfig;
 import space.axolab.axogram.UserObject;
 import space.axolab.axogram.Utilities;
@@ -10902,13 +10903,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         int resId = Theme.isCurrentThemeDark() ? R.drawable.axo_lab_icon_white : R.drawable.axo_lab_icon_black;
         if (teamBadgeDrawable[a] == null || teamBadgeDrawableResId[a] != resId) {
             teamBadgeDrawableResId[a] = resId;
-            Drawable drawable = ContextCompat.getDrawable(getParentActivity(), resId);
-            if (drawable != null) {
-                CombinedDrawable combinedDrawable = new CombinedDrawable(new ColorDrawable(Color.TRANSPARENT), drawable.mutate());
-                combinedDrawable.setCustomSize(AndroidUtilities.dp(18), AndroidUtilities.dp(18));
-                combinedDrawable.setIconSize(AndroidUtilities.dp(16), AndroidUtilities.dp(16));
-                teamBadgeDrawable[a] = combinedDrawable;
-            }
+            teamBadgeDrawable[a] = TeamBadgeDrawableHelper.create(getParentActivity(), Theme.isCurrentThemeDark(), 20, 20, 15, 7, 5);
         }
         if (teamBadgeDrawable[a] != null) {
             teamBadgeDrawable[a].setColorFilter(null);

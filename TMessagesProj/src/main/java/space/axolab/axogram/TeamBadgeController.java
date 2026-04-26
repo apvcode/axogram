@@ -254,8 +254,9 @@ public class TeamBadgeController {
         for (int account = 0; account < UserConfig.MAX_ACCOUNT_COUNT; account++) {
             NotificationCenter.getInstance(account).postNotificationName(
                 NotificationCenter.updateInterfaces,
-                MessagesController.UPDATE_MASK_NAME
+                MessagesController.UPDATE_MASK_ALL
             );
         }
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.reloadInterface);
     }
 }

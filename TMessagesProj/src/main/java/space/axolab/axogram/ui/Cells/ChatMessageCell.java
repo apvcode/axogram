@@ -128,6 +128,7 @@ import space.axolab.axogram.SendMessagesHelper;
 import space.axolab.axogram.SharedConfig;
 import space.axolab.axogram.SvgHelper;
 import space.axolab.axogram.TeamBadgeController;
+import space.axolab.axogram.TeamBadgeDrawableHelper;
 import space.axolab.axogram.TranslateController;
 import space.axolab.axogram.UserConfig;
 import space.axolab.axogram.UserObject;
@@ -21568,7 +21569,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     private int getCurrentNameTeamBadgeWidth() {
-        return currentNameHasTeamBadge ? dp(18) : 0;
+        return currentNameHasTeamBadge ? dp(22) : 0;
     }
 
     private Drawable getCurrentNameTeamBadgeDrawable() {
@@ -21578,10 +21579,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         int resId = isDark() ? R.drawable.axo_lab_icon_white : R.drawable.axo_lab_icon_black;
         if (currentNameTeamBadgeDrawable == null || currentNameTeamBadgeResId != resId) {
             currentNameTeamBadgeResId = resId;
-            Drawable drawable = ContextCompat.getDrawable(getContext(), resId);
-            if (drawable != null) {
-                currentNameTeamBadgeDrawable = drawable.mutate();
-            }
+            currentNameTeamBadgeDrawable = TeamBadgeDrawableHelper.create(getContext(), isDark(), 18, 18, 14, 6, 5);
         }
         return currentNameTeamBadgeDrawable;
     }
@@ -21595,12 +21593,13 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (drawable == null) {
             return;
         }
-        int size = dp(14);
+        int size = dp(18);
         int top = (int) (centerY - size / 2f);
         drawable.setBounds((int) left, top, (int) left + size, top + size);
         drawable.setColorFilter(null);
         drawable.setAlpha((int) (0xFF * alpha));
         drawable.draw(canvas);
+        invalidate();
     }
 
     public void drawNamesLayout(Canvas canvas, float alpha) {

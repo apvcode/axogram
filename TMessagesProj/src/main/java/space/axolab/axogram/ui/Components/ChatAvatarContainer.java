@@ -49,6 +49,7 @@ import space.axolab.axogram.LocaleController;
 import space.axolab.axogram.MessagesController;
 import space.axolab.axogram.NotificationCenter;
 import space.axolab.axogram.R;
+import space.axolab.axogram.TeamBadgeDrawableHelper;
 import space.axolab.axogram.UserConfig;
 import space.axolab.axogram.UserObject;
 import space.axolab.axogram.tgnet.ConnectionsManager;
@@ -893,6 +894,10 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
     }
 
     public void setTitle(CharSequence value, boolean scam, boolean fake, boolean verified, boolean premium, TLRPC.EmojiStatus emojiStatus, boolean animated) {
+        setTitle(value, scam, fake, verified, false, premium, emojiStatus, animated);
+    }
+
+    public void setTitle(CharSequence value, boolean scam, boolean fake, boolean verified, boolean teamBadge, boolean premium, TLRPC.EmojiStatus emojiStatus, boolean animated) {
         if (value != null) {
             value = Emoji.replaceEmoji(value, titleTextView.getPaint().getFontMetricsInt(), false);
         }
@@ -920,7 +925,11 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
             rightDrawableIsScamOrVerified = false;
             rightDrawable2ContentDescription = null;
         }
-        if (premium || DialogObject.getEmojiStatusDocumentId(emojiStatus) != 0) {
+        if (teamBadge) {
+            titleTextView.setRightDrawable(getTeamBadgeDrawable());
+            rightDrawableIsScamOrVerified = false;
+            rightDrawableContentDescription = "AxoGram team";
+        } else if (premium || DialogObject.getEmojiStatusDocumentId(emojiStatus) != 0) {
             if (titleTextView.getRightDrawable() instanceof AnimatedEmojiDrawable.WrapSizeDrawable &&
                 ((AnimatedEmojiDrawable.WrapSizeDrawable) titleTextView.getRightDrawable()).getDrawable() instanceof AnimatedEmojiDrawable) {
                 ((AnimatedEmojiDrawable) ((AnimatedEmojiDrawable.WrapSizeDrawable) titleTextView.getRightDrawable()).getDrawable()).removeView(titleTextView);
@@ -947,6 +956,20 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
     private Drawable emojiStatusDefaultDrawable;
     private Drawable verifiedBackground;
     private Drawable verifiedCheck;
+    private Drawable teamBadgeDrawable;
+    private int teamBadgeDrawableResId;
+
+    private Drawable getTeamBadgeDrawable() {
+        int resId = Theme.isCurrentThemeDark() ? R.drawable.axo_lab_icon_white : R.drawable.axo_lab_icon_black;
+        if (teamBadgeDrawable == null || teamBadgeDrawableResId != resId) {
+            teamBadgeDrawable = TeamBadgeDrawableHelper.create(getContext(), Theme.isCurrentThemeDark(), 20, 20, 15, 7, 5);
+            teamBadgeDrawableResId = resId;
+        }
+        if (teamBadgeDrawable != null) {
+            teamBadgeDrawable.setColorFilter(null);
+        }
+        return teamBadgeDrawable;
+    }
 
 
     public void setSubtitle(CharSequence value) {
