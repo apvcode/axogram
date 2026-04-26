@@ -517,6 +517,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     float panTranslationY;
 
     private View blurredView;
+    private FrameLayout dialogsEntranceOverlay;
+    private ImageView dialogsEntranceLogoView;
+    private AnimatorSet dialogsEntranceAnimator;
+    private boolean dialogsEntranceAnimationPlayed;
 
     private ItemOptions filterOptions;
 
@@ -3974,6 +3978,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         ContentView contentView = new ContentView(context);
         fragmentView = contentView;
 
+        dialogsEntranceOverlay = new FrameLayout(context);
+        dialogsEntranceOverlay.setVisibility(View.GONE);
+        dialogsEntranceOverlay.setAlpha(0f);
+        dialogsEntranceOverlay.setClickable(false);
+        dialogsEntranceOverlay.setFocusable(false);
+        contentView.addView(dialogsEntranceOverlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+        dialogsEntranceLogoView = new ImageView(context);
+        dialogsEntranceLogoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        updateDialogsEntranceLogo();
+        dialogsEntranceOverlay.addView(dialogsEntranceLogoView, LayoutHelper.createFrame(124, 124, Gravity.CENTER));
+
         viewPositionWatcher = new ViewPositionWatcher(contentView);
         iBlur3FactoryFrostedLiquidGlass.setSourceRootView(viewPositionWatcher, contentView);
         iBlur3FactoryLiquidGlass.setSourceRootView(viewPositionWatcher, contentView);
@@ -6901,6 +6917,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onResume() {
         super.onResume();
+        if (hasMainTabs && !dialogsEntranceAnimationPlayed && !onlySelect && folderId == 0 && !isInPreviewMode()) {
+            AndroidUtilities.runOnUIThread(this::playDialogsEntranceAnimationIfNeeded, 120);
+        }
         if (dialogStoriesCell != null) {
             dialogStoriesCell.onResume();
         }
@@ -7235,6 +7254,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onBecomeFullyVisible() {
         super.onBecomeFullyVisible();
+        if (!hasMainTabs) {
+            playDialogsEntranceAnimationIfNeeded();
+        }
         if (isArchive()) {
             SharedPreferences preferences = MessagesController.getGlobalMainSettings();
             boolean showArchiveHint = preferences.getBoolean("archivehint", true);
@@ -7254,6 +7276,181 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             storyHint.show();
         }
         AndroidUtilities.runOnUIThread(this::createSearchViewPager, 200);
+    }
+
+    private void updateDialogsEntranceLogo() {
+        if (dialogsEntranceLogoView == null) {
+            return;
+        }
+        final boolean isThemeDark = resourceProvider != null ? resourceProvider.isDark() : Theme.isCurrentThemeDark();
+        dialogsEntranceLogoView.setImageResource(isThemeDark ? R.drawable.axogram_splash_logo_dark : R.drawable.axogram_splash_logo_light);
+    }
+
+    public long playDialogsEntranceAnimationIfNeeded() {
+        if (dialogsEntranceAnimationPlayed || onlySelect || folderId != 0 || isInPreviewMode() || dialogsEntranceOverlay == null || dialogsEntranceLogoView == null || fragmentView == null) {
+            return 0L;
+        }
+        dialogsEntranceAnimationPlayed = true;
+        fragmentView.post(() -> {
+            if (dialogsEntranceOverlay == null || dialogsEntranceLogoView == null || fragmentView == null || fragmentView.getWidth() == 0 || fragmentView.getHeight() == 0) {
+                return;
+            }
+            if (dialogsEntranceAnimator != null) {
+                dialogsEntranceAnimator.cancel();
+            }
+            dialogsEntranceOverlay.setVisibility(View.GONE);
+            dialogsEntranceOverlay.setAlpha(0f);
+
+            final ArrayList<View> stagedViews = new ArrayList<>();
+            if (actionBar != null && actionBar.getTitleTextView() != null && actionBar.getTitleTextView().getVisibility() == View.VISIBLE) {
+                stagedViews.add(actionBar.getTitleTextView());
+            }
+            if (optionsItem != null && optionsItem.getVisibility() == View.VISIBLE) {
+                stagedViews.add(optionsItem);
+            }
+            if (fragmentSearchField != null && fragmentSearchField.getVisibility() == View.VISIBLE) {
+                stagedViews.add(fragmentSearchField);
+            }
+            if (filterTabsView != null && filterTabsView.getVisibility() == View.VISIBLE) {
+                stagedViews.add(filterTabsView);
+            }
+            if (topPanelLayout != null && topPanelLayout.getVisibility() == View.VISIBLE) {
+                stagedViews.add(topPanelLayout);
+            }
+            for (int i = 0; i < stagedViews.size(); i++) {
+                View view = stagedViews.get(i);
+                view.animate().cancel();
+                view.setAlpha(0f);
+                view.setTranslationY(-dp(18));
+            }
+
+            final ArrayList<View> dialogViews = new ArrayList<>();
+            final ViewPage activePage = viewPages != null && viewPages.length > 0 ? viewPages[0] : null;
+            if (activePage != null && activePage.listView != null) {
+                final int childCount = Math.min(activePage.listView.getChildCount(), 10);
+                for (int i = 0; i < childCount; i++) {
+                    final View child = activePage.listView.getChildAt(i);
+                    if (child == null || child.getVisibility() != View.VISIBLE) {
+                        continue;
+                    }
+                    dialogViews.add(child);
+                    child.animate().cancel();
+                    child.setAlpha(0f);
+                    child.setTranslationY(dp(28));
+                }
+            }
+
+            final ArrayList<View> fabViews = new ArrayList<>();
+            if (floatingButtonStories != null && floatingButtonStories.getVisibility() == View.VISIBLE) {
+                fabViews.add(floatingButtonStories);
+            }
+            if (floatingButton3 != null && floatingButton3.getVisibility() == View.VISIBLE) {
+                fabViews.add(floatingButton3);
+            }
+            for (int i = 0; i < fabViews.size(); i++) {
+                View view = fabViews.get(i);
+                view.animate().cancel();
+                view.setAlpha(0f);
+                view.setScaleX(0.82f);
+                view.setScaleY(0.82f);
+                view.setTranslationY(dp(28));
+            }
+
+            final ArrayList<Animator> animators = new ArrayList<>();
+            long currentDelay = 0L;
+            for (int i = 0; i < stagedViews.size(); i++) {
+                View view = stagedViews.get(i);
+                AnimatorSet set = new AnimatorSet();
+                set.playTogether(
+                        ObjectAnimator.ofFloat(view, View.ALPHA, 0f, 1f),
+                        ObjectAnimator.ofFloat(view, View.TRANSLATION_Y, -dp(18), 0f)
+                );
+                set.setStartDelay(currentDelay);
+                set.setDuration(260);
+                set.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+                animators.add(set);
+                currentDelay += 90L;
+            }
+
+            currentDelay += 60L;
+            for (int i = 0; i < dialogViews.size(); i++) {
+                View child = dialogViews.get(i);
+                AnimatorSet set = new AnimatorSet();
+                set.playTogether(
+                        ObjectAnimator.ofFloat(child, View.ALPHA, 0f, 1f),
+                        ObjectAnimator.ofFloat(child, View.TRANSLATION_Y, dp(28), 0f)
+                );
+                set.setStartDelay(currentDelay + i * 42L);
+                set.setDuration(260);
+                set.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+                animators.add(set);
+            }
+
+            currentDelay += Math.max(dialogViews.size() - 1, 0) * 42L + (dialogViews.isEmpty() ? 0L : 130L);
+            for (int i = 0; i < fabViews.size(); i++) {
+                View view = fabViews.get(i);
+                AnimatorSet set = new AnimatorSet();
+                set.playTogether(
+                        ObjectAnimator.ofFloat(view, View.ALPHA, 0f, 1f),
+                        ObjectAnimator.ofFloat(view, View.TRANSLATION_Y, dp(28), 0f),
+                        ObjectAnimator.ofFloat(view, View.SCALE_X, 0.82f, 1f),
+                        ObjectAnimator.ofFloat(view, View.SCALE_Y, 0.82f, 1f)
+                );
+                set.setStartDelay(currentDelay + i * 90L);
+                set.setDuration(260);
+                set.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+                animators.add(set);
+            }
+
+            dialogsEntranceAnimator = new AnimatorSet();
+            dialogsEntranceAnimator.playTogether(animators);
+            dialogsEntranceAnimator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    for (int i = 0; i < stagedViews.size(); i++) {
+                        View view = stagedViews.get(i);
+                        view.setAlpha(1f);
+                        view.setTranslationY(0f);
+                    }
+                    for (int i = 0; i < dialogViews.size(); i++) {
+                        View child = dialogViews.get(i);
+                        child.setAlpha(1f);
+                        child.setTranslationY(0f);
+                    }
+                    for (int i = 0; i < fabViews.size(); i++) {
+                        View view = fabViews.get(i);
+                        view.setAlpha(1f);
+                        view.setTranslationY(0f);
+                        view.setScaleX(1f);
+                        view.setScaleY(1f);
+                    }
+                    dialogsEntranceAnimator = null;
+                }
+            });
+            dialogsEntranceAnimator.start();
+        });
+        final int dialogsCount = viewPages != null && viewPages.length > 0 && viewPages[0] != null && viewPages[0].listView != null ? Math.min(viewPages[0].listView.getChildCount(), 10) : 0;
+        return stagedViewsCountEstimate() * 90L + 60L + Math.max(dialogsCount - 1, 0) * 42L + (dialogsCount == 0 ? 180L : 320L) + 240L;
+    }
+
+    private int stagedViewsCountEstimate() {
+        int count = 0;
+        if (actionBar != null && actionBar.getTitleTextView() != null && actionBar.getTitleTextView().getVisibility() == View.VISIBLE) {
+            count++;
+        }
+        if (optionsItem != null && optionsItem.getVisibility() == View.VISIBLE) {
+            count++;
+        }
+        if (fragmentSearchField != null && fragmentSearchField.getVisibility() == View.VISIBLE) {
+            count++;
+        }
+        if (filterTabsView != null && filterTabsView.getVisibility() == View.VISIBLE) {
+            count++;
+        }
+        if (topPanelLayout != null && topPanelLayout.getVisibility() == View.VISIBLE) {
+            count++;
+        }
+        return count;
     }
 
     private void showArchiveHelp() {

@@ -6,6 +6,9 @@ import static space.axolab.axogram.LocaleController.getString;
 import static space.axolab.axogram.ui.Components.Premium.LimitReachedBottomSheet.TYPE_ACCOUNTS;
 
 import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -72,6 +75,7 @@ import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
 
 public class MainTabsActivity extends ViewPagerActivity implements NotificationCenter.NotificationCenterDelegate, FactorAnimator.Target {
+    private static final String PREF_COLLAPSE_SETTINGS_TABS = "axogram_collapse_settings_tabs";
     public static final int TABS_COUNT = 4;
     private static final int POSITION_CHATS = 0;
     private static final int POSITION_CONTACTS = 1;
@@ -103,6 +107,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private MainTabsLayout tabsView;
     private BlurredBackgroundDrawable tabsViewBackground;
     private View fadeView;
+    private AnimatorSet tabsEntranceAnimator;
+    private boolean tabsEntranceAnimationPlayed;
 
     public MainTabsActivity() {
         super();
@@ -200,6 +206,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     @Override
     public void onResume() {
         super.onResume();
+        if (!tabsEntranceAnimationPlayed) {
+            AndroidUtilities.runOnUIThread(this::playMainScreenEntranceAnimationIfNeeded, 180);
+        }
         blur3_updateColors();
         checkContactsTabBadge();
         checkUnreadCount(true);
@@ -215,6 +224,12 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         Bulletin.addDelegate(contentView, delegate);
 
         showAccountChangeHint();
+    }
+
+    @Override
+    public void onBecomeFullyVisible() {
+        super.onBecomeFullyVisible();
+        playMainScreenEntranceAnimationIfNeeded();
     }
 
     private void checkContactsTabBadge() {
@@ -329,6 +344,147 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         checkUnreadCount(false);
         return contentView;
+    }
+
+    private void playMainScreenEntranceAnimationIfNeeded() {
+        if (tabsEntranceAnimationPlayed || tabsViewWrapper == null || viewPager == null || viewPager.getCurrentPosition() != POSITION_CHATS) {
+            return;
+        }
+        tabsEntranceAnimationPlayed = true;
+        long tabsDelay = 420L;
+        final BaseFragment current = getCurrentVisibleFragment();
+        if (current instanceof DialogsActivity) {
+            long childDelay = ((DialogsActivity) current).playDialogsEntranceAnimationIfNeeded();
+            if (childDelay > 0L) {
+                tabsDelay = childDelay;
+            }
+        }
+        final long finalTabsDelay = tabsDelay;
+        contentView.post(() -> {
+            if (tabsViewWrapper == null || tabsView == null) {
+                return;
+            }
+            if (tabsEntranceAnimator != null) {
+                tabsEntranceAnimator.cancel();
+            }
+            tabsViewWrapper.setAlpha(1f);
+            tabsViewWrapper.setTranslationY(0f);
+            tabsViewWrapper.setScaleX(1f);
+            tabsViewWrapper.setScaleY(1f);
+            tabsView.setPivotX(tabsView.getMeasuredWidth() / 2f);
+            tabsView.setPivotY(tabsView.getMeasuredHeight());
+            tabsView.setAlpha(0f);
+            tabsView.setScaleX(0.58f);
+            tabsView.setScaleY(0.82f);
+            tabsView.setTranslationY(dp(22));
+            for (int i = 0; i < tabs.length; i++) {
+                if (tabs[i] == null) {
+                    continue;
+                }
+                tabs[i].animate().cancel();
+                tabs[i].setAlpha(0f);
+                tabs[i].setTranslationY(dp(10));
+                tabs[i].setScaleX(0.92f);
+                tabs[i].setScaleY(0.92f);
+            }
+            if (fadeView != null) {
+                fadeView.setAlpha(0f);
+            }
+            if (updateLayoutWrapper != null) {
+                updateLayoutWrapper.setAlpha(0f);
+                updateLayoutWrapper.setTranslationY(dp(18));
+            }
+
+            tabsEntranceAnimator = new AnimatorSet();
+            ArrayList<Animator> animators = new ArrayList<>();
+
+            AnimatorSet shellAnimator = new AnimatorSet();
+            shellAnimator.playTogether(
+                ObjectAnimator.ofFloat(tabsView, View.ALPHA, 0f, 1f),
+                ObjectAnimator.ofFloat(tabsView, View.TRANSLATION_Y, dp(22), 0f),
+                ObjectAnimator.ofFloat(tabsView, View.SCALE_X, 0.58f, 1f),
+                ObjectAnimator.ofFloat(tabsView, View.SCALE_Y, 0.82f, 1f)
+            );
+            shellAnimator.setStartDelay(finalTabsDelay);
+            shellAnimator.setDuration(360);
+            shellAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+            animators.add(shellAnimator);
+
+            for (int i = 0; i < tabs.length; i++) {
+                if (tabs[i] == null) {
+                    continue;
+                }
+                AnimatorSet tabAnimator = new AnimatorSet();
+                tabAnimator.playTogether(
+                    ObjectAnimator.ofFloat(tabs[i], View.ALPHA, 0f, 1f),
+                    ObjectAnimator.ofFloat(tabs[i], View.TRANSLATION_Y, dp(10), 0f),
+                    ObjectAnimator.ofFloat(tabs[i], View.SCALE_X, 0.92f, 1f),
+                    ObjectAnimator.ofFloat(tabs[i], View.SCALE_Y, 0.92f, 1f)
+                );
+                tabAnimator.setStartDelay(finalTabsDelay + 110L + i * 45L);
+                tabAnimator.setDuration(220);
+                tabAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+                animators.add(tabAnimator);
+            }
+
+            if (fadeView != null) {
+                AnimatorSet fadeAnimator = new AnimatorSet();
+                fadeAnimator.playTogether(ObjectAnimator.ofFloat(fadeView, View.ALPHA, 0f, 1f));
+                fadeAnimator.setStartDelay(finalTabsDelay + 40L);
+                fadeAnimator.setDuration(220);
+                fadeAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+                animators.add(fadeAnimator);
+            }
+            if (updateLayoutWrapper != null) {
+                AnimatorSet updateAnimator = new AnimatorSet();
+                updateAnimator.playTogether(
+                    ObjectAnimator.ofFloat(updateLayoutWrapper, View.ALPHA, 0f, 1f),
+                    ObjectAnimator.ofFloat(updateLayoutWrapper, View.TRANSLATION_Y, dp(18), 0f)
+                );
+                updateAnimator.setStartDelay(finalTabsDelay + 60L);
+                updateAnimator.setDuration(280);
+                updateAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+                animators.add(updateAnimator);
+            }
+
+            tabsEntranceAnimator.playTogether(animators);
+            tabsEntranceAnimator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    if (tabsViewWrapper != null) {
+                        tabsViewWrapper.setAlpha(1f);
+                        tabsViewWrapper.setTranslationY(0f);
+                        tabsViewWrapper.setScaleX(1f);
+                        tabsViewWrapper.setScaleY(1f);
+                    }
+                    if (tabsView != null) {
+                        tabsView.setAlpha(1f);
+                        tabsView.setTranslationY(0f);
+                        tabsView.setScaleX(1f);
+                        tabsView.setScaleY(1f);
+                    }
+                    for (int i = 0; i < tabs.length; i++) {
+                        if (tabs[i] == null) {
+                            continue;
+                        }
+                        tabs[i].setAlpha(1f);
+                        tabs[i].setTranslationY(0f);
+                        tabs[i].setScaleX(1f);
+                        tabs[i].setScaleY(1f);
+                    }
+                    if (fadeView != null) {
+                        fadeView.setAlpha(1f);
+                    }
+                    if (updateLayoutWrapper != null) {
+                        updateLayoutWrapper.setAlpha(1f);
+                        updateLayoutWrapper.setTranslationY(0f);
+                    }
+                    tabsEntranceAnimator = null;
+                    applySettingsTabsCollapse(getSettingsTabsCollapseFactor());
+                }
+            });
+            tabsEntranceAnimator.start();
+        });
     }
 
     private void checkUnreadCount(boolean animated) {
@@ -473,6 +629,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             selectTab(viewPager.getCurrentPosition(), true);
             setGestureSelectedOverride(0, false);
         }
+        applySettingsTabsCollapse(getSettingsTabsCollapseFactor());
         blur3_invalidateBlur();
 
         if (viewPager != null) {
@@ -499,6 +656,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                 selectTab(Math.round(position), true);
             }
         }
+
+        applySettingsTabsCollapse(getSettingsTabsCollapseFactor());
 
         checkUi_fadeView();
         blur3_invalidateBlur();
@@ -591,6 +750,66 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         for (int a = 0; a < tabs.length; a++) {
             GlassTabView tab = tabs[a];
             tab.setSelected(indexToPosition(a) == position, animated);
+        }
+    }
+
+    private boolean isSettingsTabAvailable() {
+        return !getUserConfig().showCallsTab;
+    }
+
+    private float getSettingsTabsCollapseFactor() {
+        if (viewPager == null || !isSettingsTabAvailable()) {
+            return 0f;
+        }
+        if (!MessagesController.getGlobalMainSettings().getBoolean(PREF_COLLAPSE_SETTINGS_TABS, true)) {
+            return 0f;
+        }
+        return MathUtils.clamp(1f - Math.abs(POSITION_CALLS_OR_SETTINGS - viewPager.getPositionAnimated()), 0f, 1f);
+    }
+
+    private void applySettingsTabsCollapse(float factor) {
+        if (tabsView == null || tabsViewWrapper == null || tabs == null) {
+            return;
+        }
+        if (tabsEntranceAnimator != null && tabsEntranceAnimator.isRunning()) {
+            return;
+        }
+
+        tabsView.setPivotX(tabsView.getMeasuredWidth() / 2f);
+        tabsView.setPivotY(tabsView.getMeasuredHeight() / 2f);
+        final float shellScaleX = lerp(1f, 0.08f, factor);
+        final float shellScaleY = lerp(1f, 0.72f, factor);
+        final float shellTranslationY = lerp(0f, dp(10), factor);
+        final float shellAlpha = lerp(1f, 0f, factor);
+        final float tabsAlpha = lerp(1f, 0f, factor);
+        final float tabsScale = lerp(1f, 0.86f, factor);
+        final float tabsTranslationY = lerp(0f, dp(6), factor);
+        tabsView.setScaleX(shellScaleX);
+        tabsView.setScaleY(shellScaleY);
+        tabsView.setTranslationY(shellTranslationY);
+        tabsView.setAlpha(shellAlpha);
+
+        if (tabsViewBackground != null) {
+            tabsViewBackground.setAlpha((int) (255 * shellAlpha));
+        }
+        if (fadeView != null) {
+            fadeView.setAlpha(lerp(1f, 0f, factor));
+        }
+        if (updateLayoutWrapper != null) {
+            updateLayoutWrapper.setAlpha(lerp(1f, 0f, factor));
+            updateLayoutWrapper.setTranslationY(lerp(0f, dp(8), factor));
+        }
+
+        for (int i = 0; i < tabs.length; i++) {
+            final GlassTabView tab = tabs[i];
+            if (tab == null) {
+                continue;
+            }
+            tab.setAlpha(tabsAlpha);
+            tab.setScaleX(tabsScale);
+            tab.setScaleY(tabsScale);
+            tab.setTranslationX(0f);
+            tab.setTranslationY(tabsTranslationY);
         }
     }
 
