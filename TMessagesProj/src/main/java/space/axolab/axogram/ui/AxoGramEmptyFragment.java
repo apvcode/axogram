@@ -20,25 +20,21 @@ import android.widget.TextView;
 import androidx.core.graphics.ColorUtils;
 
 import space.axolab.axogram.AndroidUtilities;
-import space.axolab.axogram.MessagesController;
+import space.axolab.axogram.BuildVars;
 import space.axolab.axogram.R;
 import space.axolab.axogram.ui.ActionBar.ActionBar;
 import space.axolab.axogram.ui.ActionBar.BaseFragment;
 import space.axolab.axogram.ui.ActionBar.Theme;
-import space.axolab.axogram.ui.Cells.NotificationsCheckCell;
+import space.axolab.axogram.browser.Browser;
 import space.axolab.axogram.ui.Components.CubicBezierInterpolator;
 
 import java.util.Random;
 
 public class AxoGramEmptyFragment extends BaseFragment {
-    private static final int ID_COLLAPSE_SETTINGS_TABS = 1;
-    private static final String PREF_COLLAPSE_SETTINGS_TABS = "axogram_collapse_settings_tabs";
     private ValueAnimator logoRotationAnimator;
-    private ValueAnimator logoAmbientAnimator;
 
     @Override
     public View createView(Context context) {
-        final boolean isDarkTheme = resourceProvider != null ? resourceProvider.isDark() : Theme.isCurrentThemeDark();
         actionBar.setAddToContainer(false);
         actionBar.setTitle("");
         actionBar.setAllowOverlayTitle(true);
@@ -291,7 +287,6 @@ public class AxoGramEmptyFragment extends BaseFragment {
         );
         heroLayout.addView(logoCardContainer, logoCardContainerLayoutParams);
 
-        final float[] logoAmbientPhase = new float[] {0f};
         final float[] logoPressLevel = new float[] {0f};
 
         FrameLayout topLogoCard = new FrameLayout(context);
@@ -366,14 +361,6 @@ public class AxoGramEmptyFragment extends BaseFragment {
             topLogoView.setRotation(rotation);
         });
         logoRotationAnimator.start();
-        logoAmbientAnimator = ValueAnimator.ofFloat(0f, 1f);
-        logoAmbientAnimator.setDuration(4200);
-        logoAmbientAnimator.setInterpolator(new LinearInterpolator());
-        logoAmbientAnimator.setRepeatCount(ValueAnimator.INFINITE);
-        logoAmbientAnimator.addUpdateListener(animation -> {
-            logoAmbientPhase[0] = (float) animation.getAnimatedValue();
-        });
-        logoAmbientAnimator.start();
 
         TextView heroTitleView = new TextView(context);
         heroTitleView.setText("AxoGram");
@@ -385,142 +372,100 @@ public class AxoGramEmptyFragment extends BaseFragment {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
         );
-        heroTitleLayoutParams.topMargin = AndroidUtilities.dp(18);
+        heroTitleLayoutParams.topMargin = AndroidUtilities.dp(8);
         heroLayout.addView(heroTitleView, heroTitleLayoutParams);
 
-        FrameLayout optionCard = new FrameLayout(context);
-        GradientDrawable optionCardBackground = new GradientDrawable();
-        optionCardBackground.setShape(GradientDrawable.RECTANGLE);
-        optionCardBackground.setCornerRadius(AndroidUtilities.dp(20));
-        optionCardBackground.setColor(ColorUtils.blendARGB(
-                Theme.getColor(Theme.key_windowBackgroundWhite),
-                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText),
-                isDarkTheme ? 0.10f : 0.04f
-        ));
-        optionCardBackground.setStroke(AndroidUtilities.dp(1), ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 42 : 24));
-        optionCard.setBackground(optionCardBackground);
-        FrameLayout.LayoutParams optionCardParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-        );
-        optionCardParams.leftMargin = AndroidUtilities.dp(16);
-        optionCardParams.rightMargin = AndroidUtilities.dp(16);
-        optionCardParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(292);
-        optionCardParams.gravity = Gravity.TOP;
-        contentView.addView(optionCard, optionCardParams);
-
-        NotificationsCheckCell optionCell = new NotificationsCheckCell(context, 21, 76, false, resourceProvider);
-        optionCell.setDrawLine(false);
-        optionCell.setBackgroundColor(0);
-        final int defaultCardColor = Theme.getColor(Theme.key_windowBackgroundWhite);
-        final int accentColor = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText);
-        final int mutedTextColor = Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4);
-        optionCell.setTextAndValueAndCheck(
-                "Сворачивать нижнюю панель в настройках",
-                "Если выключить, нижняя панель в настройках останется видимой как раньше.",
-                MessagesController.getGlobalMainSettings().getBoolean(PREF_COLLAPSE_SETTINGS_TABS, true),
-                0,
-                false,
-                false
-        );
-        optionCard.addView(optionCell, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
-
-        TextView infoView = new TextView(context);
-        infoView.setText("Включено по умолчанию.");
-        infoView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
-        infoView.setTextSize(12);
-        infoView.setGravity(Gravity.CENTER);
-        infoView.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(6), AndroidUtilities.dp(12), AndroidUtilities.dp(6));
-        GradientDrawable infoBackground = new GradientDrawable();
-        infoBackground.setShape(GradientDrawable.RECTANGLE);
-        infoBackground.setCornerRadius(AndroidUtilities.dp(13));
-        infoBackground.setColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 26 : 18));
-        infoView.setBackground(infoBackground);
-        FrameLayout.LayoutParams infoLayoutParams = new FrameLayout.LayoutParams(
+        TextView heroVersionView = new TextView(context);
+        heroVersionView.setText(BuildVars.BUILD_VERSION_STRING);
+        heroVersionView.setTextColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_actionBarDefaultTitle), 160));
+        heroVersionView.setTextSize(13);
+        heroVersionView.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams heroVersionLayoutParams = new LinearLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
         );
-        infoLayoutParams.gravity = Gravity.TOP | Gravity.LEFT;
-        infoLayoutParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(374);
-        infoLayoutParams.leftMargin = AndroidUtilities.dp(20);
-        contentView.addView(infoView, infoLayoutParams);
+        heroVersionLayoutParams.topMargin = AndroidUtilities.dp(2);
+        heroLayout.addView(heroVersionView, heroVersionLayoutParams);
 
-        final ValueAnimator[] appearanceAnimator = new ValueAnimator[1];
-        final float[] currentProgress = new float[] {
-                MessagesController.getGlobalMainSettings().getBoolean(PREF_COLLAPSE_SETTINGS_TABS, true) ? 1f : 0f
-        };
+        TextView categoriesHeaderView = new TextView(context);
+        categoriesHeaderView.setText("Категории");
+        categoriesHeaderView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        categoriesHeaderView.setTextSize(14);
+        categoriesHeaderView.setTypeface(AndroidUtilities.bold());
+        FrameLayout.LayoutParams categoriesHeaderLayoutParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        categoriesHeaderLayoutParams.gravity = Gravity.TOP | Gravity.LEFT;
+        categoriesHeaderLayoutParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(308);
+        categoriesHeaderLayoutParams.leftMargin = AndroidUtilities.dp(28);
+        contentView.addView(categoriesHeaderView, categoriesHeaderLayoutParams);
 
-        Runnable updateOptionAppearance = () -> {
-            boolean enabled = MessagesController.getGlobalMainSettings().getBoolean(PREF_COLLAPSE_SETTINGS_TABS, true);
-            float targetProgress = enabled ? 1f : 0f;
-            if (appearanceAnimator[0] != null) {
-                appearanceAnimator[0].cancel();
-            }
-            ValueAnimator animator = ValueAnimator.ofFloat(currentProgress[0], targetProgress);
-            appearanceAnimator[0] = animator;
-            animator.setDuration(260);
-            animator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
-            animator.addUpdateListener(valueAnimator -> {
-                float progress = (float) valueAnimator.getAnimatedValue();
-                currentProgress[0] = progress;
+        LinearLayout categoriesLayout = new LinearLayout(context);
+        categoriesLayout.setOrientation(LinearLayout.VERTICAL);
+        FrameLayout.LayoutParams categoriesLayoutParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        categoriesLayoutParams.gravity = Gravity.TOP;
+        categoriesLayoutParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(334);
+        categoriesLayoutParams.leftMargin = AndroidUtilities.dp(20);
+        categoriesLayoutParams.rightMargin = AndroidUtilities.dp(20);
+        contentView.addView(categoriesLayout, categoriesLayoutParams);
 
-                int enabledCardColor = ColorUtils.blendARGB(
-                        defaultCardColor,
-                        accentColor,
-                        isDarkTheme ? 0.10f : 0.04f
-                );
-                int disabledCardColor = ColorUtils.blendARGB(
-                        defaultCardColor,
-                        Theme.getColor(Theme.key_windowBackgroundGray),
-                        isDarkTheme ? 0.22f : 0.10f
-                );
-                optionCardBackground.setColor(ColorUtils.blendARGB(disabledCardColor, enabledCardColor, progress));
-                optionCardBackground.setStroke(
-                        AndroidUtilities.dp(1),
-                        ColorUtils.blendARGB(
-                                ColorUtils.setAlphaComponent(defaultCardColor, isDarkTheme ? 16 : 10),
-                                ColorUtils.setAlphaComponent(accentColor, isDarkTheme ? 42 : 24),
-                                progress
-                        )
-                );
+        categoriesLayout.addView(createSectionRow(context, R.drawable.ghost, "Режим призрака", () -> presentFragment(new AxoGramSectionFragment(AxoGramSectionFragment.TYPE_GHOST))));
+        categoriesLayout.addView(createSectionRow(context, R.drawable.msg_bot, "Шпион", () -> presentFragment(new AxoGramSectionFragment(AxoGramSectionFragment.TYPE_SPY))));
+        categoriesLayout.addView(createSectionRow(context, R.drawable.msg_mini_customize, "Кастомизация", () -> presentFragment(new AxoGramSectionFragment(AxoGramSectionFragment.TYPE_CUSTOMIZATION))));
+        categoriesLayout.addView(createSectionRow(context, R.drawable.msg_settings, "Функции", () -> presentFragment(new AxoGramSectionFragment(AxoGramSectionFragment.TYPE_FEATURES))));
 
-                if (progress > 0.5f) {
-                    optionCell.getCheckBox().setColors(
-                            Theme.key_switchTrackBlue,
-                            Theme.key_switchTrackBlueChecked,
-                            Theme.key_switchTrackBlueThumb,
-                            Theme.key_switchTrackBlueThumbChecked
-                    );
-                } else {
-                    optionCell.getCheckBox().setColors(
-                            Theme.key_switchTrack,
-                            Theme.key_switchTrack,
-                            Theme.key_windowBackgroundWhite,
-                            Theme.key_windowBackgroundWhite
-                    );
+        LinearLayout linksLayout = new LinearLayout(context);
+        linksLayout.setOrientation(LinearLayout.VERTICAL);
+        FrameLayout.LayoutParams linksLayoutParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        linksLayoutParams.gravity = Gravity.BOTTOM;
+        linksLayoutParams.leftMargin = AndroidUtilities.dp(20);
+        linksLayoutParams.rightMargin = AndroidUtilities.dp(20);
+        linksLayoutParams.bottomMargin = AndroidUtilities.dp(28);
+        contentView.addView(linksLayout, linksLayoutParams);
+
+        View dividerView = new View(context);
+        GradientDrawable dividerDrawable = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[] {
+                        ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), 0),
+                        ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), 120),
+                        ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), 0)
                 }
+        );
+        dividerDrawable.setCornerRadius(AndroidUtilities.dp(2));
+        dividerView.setBackground(dividerDrawable);
+        LinearLayout.LayoutParams dividerLayoutParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                AndroidUtilities.dp(2)
+        );
+        dividerLayoutParams.bottomMargin = AndroidUtilities.dp(16);
+        linksLayout.addView(dividerView, dividerLayoutParams);
 
-                infoView.setTextColor(ColorUtils.blendARGB(mutedTextColor, accentColor, progress));
-                infoBackground.setColor(ColorUtils.blendARGB(
-                        ColorUtils.setAlphaComponent(defaultCardColor, isDarkTheme ? 18 : 12),
-                        ColorUtils.setAlphaComponent(accentColor, isDarkTheme ? 26 : 18),
-                        progress
-                ));
-                optionCell.setAlpha(AndroidUtilities.lerp(0.92f, 1.0f, progress));
-                infoView.setAlpha(AndroidUtilities.lerp(0.72f, 1.0f, progress));
-                optionCard.invalidate();
-                optionCell.invalidate();
-                infoView.invalidate();
-            });
-            animator.start();
-        };
-        optionCell.setOnClickListener(v -> {
-            final boolean enabled = !MessagesController.getGlobalMainSettings().getBoolean(PREF_COLLAPSE_SETTINGS_TABS, true);
-            MessagesController.getGlobalMainSettings().edit().putBoolean(PREF_COLLAPSE_SETTINGS_TABS, enabled).apply();
-            optionCell.setChecked(enabled);
-            updateOptionAppearance.run();
-        });
-        updateOptionAppearance.run();
+        TextView linksHeaderView = new TextView(context);
+        linksHeaderView.setText("Ссылки");
+        linksHeaderView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        linksHeaderView.setTextSize(14);
+        linksHeaderView.setTypeface(AndroidUtilities.bold());
+        LinearLayout.LayoutParams linksHeaderLayoutParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        linksHeaderLayoutParams.bottomMargin = AndroidUtilities.dp(10);
+        linksLayout.addView(linksHeaderView, linksHeaderLayoutParams);
+
+        linksLayout.addView(createSectionRow(
+                context,
+                R.drawable.msg_channel,
+                "AxoGram Releases",
+                () -> Browser.openUrl(context, "https://t.me/AxoGramReleases")
+        ));
 
         fragmentView = contentView;
         return fragmentView;
@@ -531,10 +476,6 @@ public class AxoGramEmptyFragment extends BaseFragment {
         if (logoRotationAnimator != null) {
             logoRotationAnimator.cancel();
             logoRotationAnimator = null;
-        }
-        if (logoAmbientAnimator != null) {
-            logoAmbientAnimator.cancel();
-            logoAmbientAnimator = null;
         }
         super.onFragmentDestroy();
     }
@@ -550,6 +491,79 @@ public class AxoGramEmptyFragment extends BaseFragment {
             logoView.setScaleY(scale);
         });
         animator.start();
+    }
+
+    private View createSectionRow(Context context, int iconRes, String title, Runnable onClick) {
+        FrameLayout rowLayout = new FrameLayout(context);
+        rowLayout.setClickable(true);
+        rowLayout.setFocusable(true);
+        rowLayout.setOnClickListener(v -> onClick.run());
+
+        int rowDefaultColor = ColorUtils.blendARGB(
+                Theme.getColor(Theme.key_windowBackgroundWhite),
+                Theme.getColor(Theme.key_windowBackgroundGray),
+                Theme.isCurrentThemeDark() ? 0.16f : 0.05f
+        );
+        int rowPressedColor = ColorUtils.blendARGB(
+                rowDefaultColor,
+                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText),
+                Theme.isCurrentThemeDark() ? 0.12f : 0.08f
+        );
+        rowLayout.setBackground(Theme.createSimpleSelectorRoundRectDrawable(
+                AndroidUtilities.dp(22),
+                rowDefaultColor,
+                rowPressedColor
+        ));
+        LinearLayout.LayoutParams rowLayoutParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                AndroidUtilities.dp(58)
+        );
+        rowLayoutParams.bottomMargin = AndroidUtilities.dp(8);
+        rowLayout.setLayoutParams(rowLayoutParams);
+
+        LinearLayout contentLayout = new LinearLayout(context);
+        contentLayout.setOrientation(LinearLayout.HORIZONTAL);
+        contentLayout.setGravity(Gravity.CENTER_VERTICAL);
+        contentLayout.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(0), AndroidUtilities.dp(12), AndroidUtilities.dp(0));
+        rowLayout.addView(contentLayout, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        GradientDrawable iconPillDrawable = new GradientDrawable();
+        iconPillDrawable.setShape(GradientDrawable.RECTANGLE);
+        iconPillDrawable.setCornerRadius(AndroidUtilities.dp(16));
+        iconPillDrawable.setColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), Theme.isCurrentThemeDark() ? 20 : 12));
+        FrameLayout iconHolder = new FrameLayout(context);
+        iconHolder.setBackground(iconPillDrawable);
+        LinearLayout.LayoutParams iconHolderLayoutParams = new LinearLayout.LayoutParams(AndroidUtilities.dp(34), AndroidUtilities.dp(34));
+        iconHolderLayoutParams.rightMargin = AndroidUtilities.dp(12);
+        contentLayout.addView(iconHolder, iconHolderLayoutParams);
+
+        ImageView iconView = new ImageView(context);
+        iconView.setImageResource(iconRes);
+        iconView.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        iconView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        FrameLayout.LayoutParams iconFrameLayoutParams = new FrameLayout.LayoutParams(AndroidUtilities.dp(20), AndroidUtilities.dp(20), Gravity.CENTER);
+        iconHolder.addView(iconView, iconFrameLayoutParams);
+
+        TextView titleView = new TextView(context);
+        titleView.setText(title);
+        titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        titleView.setTextSize(16);
+        titleView.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MEDIUM));
+        LinearLayout.LayoutParams titleLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        contentLayout.addView(titleView, titleLayoutParams);
+
+        TextView chevronView = new TextView(context);
+        chevronView.setText("›");
+        chevronView.setTextColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4), 135));
+        chevronView.setTextSize(19);
+        LinearLayout.LayoutParams chevronLayoutParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        chevronLayoutParams.gravity = Gravity.CENTER_VERTICAL;
+        chevronLayoutParams.leftMargin = AndroidUtilities.dp(12);
+        View spacerView = new View(context);
+        contentLayout.addView(spacerView, chevronLayoutParams);
+        contentLayout.addView(chevronView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        return rowLayout;
     }
 
     private static float easeInOutSegment(float from, float to, float t) {
