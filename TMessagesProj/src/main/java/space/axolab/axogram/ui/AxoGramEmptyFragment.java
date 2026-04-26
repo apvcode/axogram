@@ -5,6 +5,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
+import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.GradientDrawable;
 import android.os.SystemClock;
@@ -34,6 +35,7 @@ public class AxoGramEmptyFragment extends BaseFragment {
     private static final int ID_COLLAPSE_SETTINGS_TABS = 1;
     private static final String PREF_COLLAPSE_SETTINGS_TABS = "axogram_collapse_settings_tabs";
     private ValueAnimator logoRotationAnimator;
+    private ValueAnimator logoAmbientAnimator;
 
     @Override
     public View createView(Context context) {
@@ -283,6 +285,53 @@ public class AxoGramEmptyFragment extends BaseFragment {
         heroLayoutParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(28);
         contentView.addView(heroLayout, heroLayoutParams);
 
+        FrameLayout logoCardContainer = new FrameLayout(context);
+        LinearLayout.LayoutParams logoCardContainerLayoutParams = new LinearLayout.LayoutParams(
+                AndroidUtilities.dp(196),
+                AndroidUtilities.dp(196)
+        );
+        heroLayout.addView(logoCardContainer, logoCardContainerLayoutParams);
+
+        final float[] logoAmbientPhase = new float[] {0f};
+        final float[] logoPressLevel = new float[] {0f};
+
+        View logoGlowView = new View(context) {
+            private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final RectF rect = new RectF();
+
+            {
+                setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            }
+
+            @Override
+            protected void onDraw(Canvas canvas) {
+                int w = getWidth();
+                int h = getHeight();
+                float inset = AndroidUtilities.dp(32);
+                float radius = AndroidUtilities.dp(34);
+                int accent = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText);
+                float ambient = 0.75f + 0.25f * (float) Math.sin(logoAmbientPhase[0] * Math.PI * 2.0);
+                float pressBoost = 1f + 0.55f * logoPressLevel[0];
+                rect.set(inset, inset, w - inset, h - inset);
+                glowPaint.clearShadowLayer();
+                glowPaint.setStyle(Paint.Style.FILL);
+                glowPaint.setColor(ColorUtils.setAlphaComponent(accent, 12));
+                glowPaint.setShadowLayer(AndroidUtilities.dp(26), 0, 0, ColorUtils.setAlphaComponent(accent, (int) (48 * ambient * pressBoost)));
+                canvas.drawRoundRect(rect, radius, radius, glowPaint);
+                glowPaint.setColor(ColorUtils.setAlphaComponent(accent, 8));
+                glowPaint.setShadowLayer(AndroidUtilities.dp(40), 0, 0, ColorUtils.setAlphaComponent(accent, (int) (24 * ambient * pressBoost)));
+                canvas.drawRoundRect(rect, radius, radius, glowPaint);
+                glowPaint.clearShadowLayer();
+            }
+        };
+        FrameLayout.LayoutParams logoGlowLayoutParams = new FrameLayout.LayoutParams(
+                AndroidUtilities.dp(208),
+                AndroidUtilities.dp(208),
+                Gravity.CENTER
+        );
+        logoGlowView.setAlpha(0.92f);
+        logoCardContainer.addView(logoGlowView, logoGlowLayoutParams);
+
         FrameLayout topLogoCard = new FrameLayout(context);
         GradientDrawable topLogoCardBackground = new GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
@@ -291,27 +340,110 @@ public class AxoGramEmptyFragment extends BaseFragment {
         topLogoCardBackground.setCornerRadius(AndroidUtilities.dp(30));
         topLogoCardBackground.setStroke(AndroidUtilities.dp(1), ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhite), 12));
         topLogoCard.setBackground(topLogoCardBackground);
-        LinearLayout.LayoutParams topLogoCardLayoutParams = new LinearLayout.LayoutParams(
+
+        View logoShineView = new View(context) {
+            private final Paint shinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+            @Override
+            protected void onDraw(Canvas canvas) {
+                int w = getWidth();
+                int h = getHeight();
+                float ambient = logoAmbientPhase[0];
+                float pressBoost = logoPressLevel[0];
+                float bandCenter = (-0.35f + ambient * 1.7f) * w;
+                float bandWidth = AndroidUtilities.dp(56);
+                shinePaint.setShader(new RadialGradient(
+                        bandCenter,
+                        h * 0.46f,
+                        bandWidth,
+                        new int[] {
+                                ColorUtils.setAlphaComponent(0xFFFFFFFF, (int) (18 + 16 * pressBoost)),
+                                ColorUtils.setAlphaComponent(0xFFFFFFFF, (int) (8 + 8 * pressBoost)),
+                                0x00FFFFFF
+                        },
+                        new float[] {0f, 0.55f, 1f},
+                        Shader.TileMode.CLAMP
+                ));
+                canvas.save();
+                canvas.rotate(-24f, w / 2f, h / 2f);
+                canvas.drawRect(0, 0, w, h, shinePaint);
+                canvas.restore();
+            }
+        };
+        FrameLayout.LayoutParams topLogoCardLayoutParams = new FrameLayout.LayoutParams(
                 AndroidUtilities.dp(156),
                 AndroidUtilities.dp(156)
         );
-        heroLayout.addView(topLogoCard, topLogoCardLayoutParams);
+        topLogoCardLayoutParams.gravity = Gravity.CENTER;
+        logoCardContainer.addView(topLogoCard, topLogoCardLayoutParams);
+        topLogoCard.addView(logoShineView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         ImageView topLogoView = new ImageView(context);
-        topLogoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        topLogoView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         topLogoView.setImageResource(R.drawable.axogram_logo_app_in_nobg);
         FrameLayout.LayoutParams topLogoLayoutParams = new FrameLayout.LayoutParams(
-                AndroidUtilities.dp(156),
-                AndroidUtilities.dp(156),
+                AndroidUtilities.dp(152),
+                AndroidUtilities.dp(152),
                 Gravity.CENTER
         );
         topLogoCard.addView(topLogoView, topLogoLayoutParams);
+
+        logoCardContainer.setOnTouchListener((v, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    v.animate().scaleX(0.92f).scaleY(0.92f).setDuration(180).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+                    animateLogoPress(logoPressLevel, logoGlowView, logoShineView, topLogoView, 1f);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(220).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+                    animateLogoPress(logoPressLevel, logoGlowView, logoShineView, topLogoView, 0f);
+                    v.performClick();
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(220).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+                    animateLogoPress(logoPressLevel, logoGlowView, logoShineView, topLogoView, 0f);
+                    return true;
+                default:
+                    return true;
+            }
+        });
         logoRotationAnimator = ValueAnimator.ofFloat(0f, 1f);
-        logoRotationAnimator.setDuration(2400);
+        logoRotationAnimator.setDuration(4600);
         logoRotationAnimator.setInterpolator(new LinearInterpolator());
         logoRotationAnimator.setRepeatCount(ValueAnimator.INFINITE);
-        logoRotationAnimator.addUpdateListener(animation -> topLogoView.setRotation(360f * (float) animation.getAnimatedValue()));
+        logoRotationAnimator.addUpdateListener(animation -> {
+            float phase = (float) animation.getAnimatedValue();
+            float rotation;
+            if (phase < 0.10f) {
+                rotation = easeInSegment(0f, 40f, phase / 0.10f);
+            } else if (phase < 0.18f) {
+                rotation = easeInSegment(40f, 150f, (phase - 0.10f) / 0.08f);
+            } else if (phase < 0.34f) {
+                rotation = linearSegment(150f, 430f, (phase - 0.18f) / 0.16f);
+            } else if (phase < 0.48f) {
+                rotation = easeOutSegment(430f, 540f, (phase - 0.34f) / 0.14f);
+            } else if (phase < 0.74f) {
+                rotation = 540f;
+            } else if (phase < 0.84f) {
+                rotation = easeOutSegment(540f, 650f, (phase - 0.74f) / 0.10f);
+            } else if (phase < 1f) {
+                rotation = easeOutSegment(650f, 720f, (phase - 0.84f) / 0.16f);
+            } else {
+                rotation = 720f;
+            }
+            topLogoView.setRotation(rotation);
+        });
         logoRotationAnimator.start();
+        logoAmbientAnimator = ValueAnimator.ofFloat(0f, 1f);
+        logoAmbientAnimator.setDuration(4200);
+        logoAmbientAnimator.setInterpolator(new LinearInterpolator());
+        logoAmbientAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        logoAmbientAnimator.addUpdateListener(animation -> {
+            logoAmbientPhase[0] = (float) animation.getAnimatedValue();
+            logoGlowView.invalidate();
+            logoShineView.invalidate();
+        });
+        logoAmbientAnimator.start();
 
         TextView heroTitleView = new TextView(context);
         heroTitleView.setText("AxoGram");
@@ -470,6 +602,48 @@ public class AxoGramEmptyFragment extends BaseFragment {
             logoRotationAnimator.cancel();
             logoRotationAnimator = null;
         }
+        if (logoAmbientAnimator != null) {
+            logoAmbientAnimator.cancel();
+            logoAmbientAnimator = null;
+        }
         super.onFragmentDestroy();
+    }
+
+    private static void animateLogoPress(float[] pressLevel, View glowView, View shineView, View logoView, float to) {
+        ValueAnimator animator = ValueAnimator.ofFloat(pressLevel[0], to);
+        animator.setDuration(to > pressLevel[0] ? 160 : 220);
+        animator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+        animator.addUpdateListener(a -> {
+            pressLevel[0] = (float) a.getAnimatedValue();
+            float scale = AndroidUtilities.lerp(1f, 0.96f, pressLevel[0]);
+            logoView.setScaleX(scale);
+            logoView.setScaleY(scale);
+            glowView.invalidate();
+            shineView.invalidate();
+        });
+        animator.start();
+    }
+
+    private static float easeInOutSegment(float from, float to, float t) {
+        t = Math.max(0f, Math.min(1f, t));
+        float eased = (1f - (float) Math.cos(Math.PI * t)) * 0.5f;
+        return AndroidUtilities.lerp(from, to, eased);
+    }
+
+    private static float easeOutSegment(float from, float to, float t) {
+        t = Math.max(0f, Math.min(1f, t));
+        float eased = 1f - (1f - t) * (1f - t);
+        return AndroidUtilities.lerp(from, to, eased);
+    }
+
+    private static float linearSegment(float from, float to, float t) {
+        t = Math.max(0f, Math.min(1f, t));
+        return AndroidUtilities.lerp(from, to, t);
+    }
+
+    private static float easeInSegment(float from, float to, float t) {
+        t = Math.max(0f, Math.min(1f, t));
+        float eased = t * t;
+        return AndroidUtilities.lerp(from, to, eased);
     }
 }
