@@ -61,6 +61,7 @@ import space.axolab.axogram.ApplicationLoader;
 import space.axolab.axogram.FileLog;
 import space.axolab.axogram.LiteMode;
 import space.axolab.axogram.LocaleController;
+import space.axolab.axogram.MessagesController;
 import space.axolab.axogram.NotificationCenter;
 import space.axolab.axogram.R;
 import space.axolab.axogram.SharedConfig;
@@ -87,6 +88,8 @@ import java.util.ArrayList;
 import java.util.Map;
 
 public class AlertDialog extends Dialog implements Drawable.Callback, NotificationCenter.NotificationCenterDelegate {
+    private static final String PREF_DIALOG_CORNER_RADIUS = "axogram_dialog_corner_radius_dp";
+    private static final int DEFAULT_DIALOG_CORNER_RADIUS_DP = 36;
 
     public static final int ALERT_TYPE_MESSAGE = 0;
     public static final int ALERT_TYPE_LOADING = 2;
@@ -217,6 +220,15 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
     float blurAlpha = 0.8f;
     private boolean blurBehind;
     private int additioanalHorizontalPadding;
+
+    public static int getDialogCornerRadiusDp() {
+        int value = MessagesController.getGlobalMainSettings().getInt(PREF_DIALOG_CORNER_RADIUS, DEFAULT_DIALOG_CORNER_RADIUS_DP);
+        return Math.max(12, Math.min(36, value));
+    }
+
+    private float getDialogCornerRadius() {
+        return dp(getDialogCornerRadiusDp());
+    }
 
     public void setBlurParams(float blurAlpha, boolean blurBehind, boolean blurBackground) {
         this.blurAlpha = blurAlpha;
@@ -562,7 +574,7 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
             if (blurredBackground && !blurredNativeBackground) {
                 float r;
                 if (progressViewStyle == ALERT_TYPE_SPINNER && progressViewContainer != null) {
-                    r = dp(18);
+                    r = getDialogCornerRadius();
                     float w = progressViewContainer.getWidth() * progressViewContainer.getScaleX();
                     float h = progressViewContainer.getHeight() * progressViewContainer.getScaleY();
                     AndroidUtilities.rectTmp.set(
@@ -572,7 +584,7 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
                             (getHeight() + h) / 2f
                     );
                 } else {
-                    r = dp(10);
+                    r = getDialogCornerRadius();
                     AndroidUtilities.rectTmp.set(getPaddingLeft(), getPaddingTop(), getMeasuredWidth() - getPaddingRight(), getMeasuredHeight() - getPaddingBottom());
                 }
 
@@ -660,7 +672,7 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
                 containerView.setPadding(0, 0, 0, 0);
                 containerView.setBackground(shadowDrawable);
 
-                containerView.setOutlineProvider(ViewOutlineProviderImpl.boundsWithPaddingRoundRect(dp(8), dp(20)));
+                containerView.setOutlineProvider(ViewOutlineProviderImpl.boundsWithPaddingRoundRect(dp(8), getDialogCornerRadius()));
                 containerView.setClipToOutline(true);
 
                 drawBackground = false;
@@ -1275,7 +1287,7 @@ public class AlertDialog extends Dialog implements Drawable.Callback, Notificati
                 if (progressViewStyle == ALERT_TYPE_MESSAGE) {
                     blurredNativeBackground = true;
                     window.setBackgroundBlurRadius(50);
-                    float rad = dp(12);
+                    float rad = getDialogCornerRadius();
                     ShapeDrawable shapeDrawable = new ShapeDrawable(new RoundRectShape(new float[]{rad, rad, rad, rad, rad, rad, rad, rad}, null, null));
                     shapeDrawable.getPaint().setColor(ColorUtils.setAlphaComponent(backgroundColor, (int) (blurAlpha * 255)));
                     window.setBackgroundDrawable(shapeDrawable);

@@ -23,10 +23,12 @@ import space.axolab.axogram.AndroidUtilities;
 import space.axolab.axogram.MessagesController;
 import space.axolab.axogram.R;
 import space.axolab.axogram.ui.ActionBar.ActionBar;
+import space.axolab.axogram.ui.ActionBar.AlertDialog;
 import space.axolab.axogram.ui.ActionBar.BaseFragment;
 import space.axolab.axogram.ui.ActionBar.Theme;
 import space.axolab.axogram.ui.Cells.NotificationsCheckCell;
 import space.axolab.axogram.ui.Components.CubicBezierInterpolator;
+import space.axolab.axogram.ui.Components.SeekBarView;
 
 public class AxoGramSectionFragment extends BaseFragment {
     public static final int TYPE_GHOST = 0;
@@ -35,9 +37,13 @@ public class AxoGramSectionFragment extends BaseFragment {
     public static final int TYPE_FEATURES = 3;
 
     private static final String PREF_COLLAPSE_SETTINGS_TABS = "axogram_collapse_settings_tabs";
+    private static final String PREF_DIALOG_CORNER_RADIUS = "axogram_dialog_corner_radius_dp";
     private static final String PREF_GHOST_ONLINE = "axogram_ghost_hide_online";
     private static final String PREF_GHOST_READ = "axogram_ghost_hide_read";
     private static final String PREF_GHOST_TYPING = "axogram_ghost_hide_typing";
+    private static final int DEFAULT_DIALOG_CORNER_RADIUS_DP = 36;
+    private static final int MIN_DIALOG_CORNER_RADIUS_DP = 12;
+    private static final int MAX_DIALOG_CORNER_RADIUS_DP = 36;
 
     private final int type;
 
@@ -331,6 +337,193 @@ public class AxoGramSectionFragment extends BaseFragment {
             updateOptionAppearance.run();
         });
         updateOptionAppearance.run();
+        addDialogRadiusContent(context, contentView, isDarkTheme);
+    }
+
+    private void addDialogRadiusContent(Context context, FrameLayout contentView, boolean isDarkTheme) {
+        TextView sectionHeaderView = new TextView(context);
+        sectionHeaderView.setText("Скругление обращений");
+        sectionHeaderView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        sectionHeaderView.setTextSize(14);
+        sectionHeaderView.setTypeface(AndroidUtilities.bold());
+        FrameLayout.LayoutParams headerLayoutParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        headerLayoutParams.gravity = Gravity.TOP | Gravity.LEFT;
+        headerLayoutParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(286);
+        headerLayoutParams.leftMargin = AndroidUtilities.dp(28);
+        contentView.addView(sectionHeaderView, headerLayoutParams);
+
+        FrameLayout previewCard = new FrameLayout(context);
+        GradientDrawable previewCardBackground = new GradientDrawable();
+        previewCardBackground.setShape(GradientDrawable.RECTANGLE);
+        previewCardBackground.setCornerRadius(AndroidUtilities.dp(20));
+        previewCardBackground.setColor(ColorUtils.blendARGB(
+                Theme.getColor(Theme.key_windowBackgroundWhite),
+                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText),
+                isDarkTheme ? 0.06f : 0.03f
+        ));
+        previewCardBackground.setStroke(AndroidUtilities.dp(1), ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 26 : 16));
+        previewCard.setBackground(previewCardBackground);
+        FrameLayout.LayoutParams previewCardParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(286));
+        previewCardParams.gravity = Gravity.TOP;
+        previewCardParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(314);
+        previewCardParams.leftMargin = AndroidUtilities.dp(16);
+        previewCardParams.rightMargin = AndroidUtilities.dp(16);
+        contentView.addView(previewCard, previewCardParams);
+
+        TextView previewLabel = new TextView(context);
+        previewLabel.setText("Предпросмотр");
+        previewLabel.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
+        previewLabel.setTextSize(13);
+        FrameLayout.LayoutParams previewLabelParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        previewLabelParams.gravity = Gravity.TOP | Gravity.LEFT;
+        previewLabelParams.topMargin = AndroidUtilities.dp(16);
+        previewLabelParams.leftMargin = AndroidUtilities.dp(18);
+        previewCard.addView(previewLabel, previewLabelParams);
+
+        FrameLayout previewStage = new FrameLayout(context);
+        GradientDrawable previewStageBackground = new GradientDrawable();
+        previewStageBackground.setShape(GradientDrawable.RECTANGLE);
+        previewStageBackground.setCornerRadius(AndroidUtilities.dp(18));
+        previewStageBackground.setColor(ColorUtils.blendARGB(
+                Theme.getColor(Theme.key_windowBackgroundWhiteBlackText),
+                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText),
+                isDarkTheme ? 0.16f : 0.09f
+        ));
+        previewStage.setBackground(previewStageBackground);
+        FrameLayout.LayoutParams previewStageParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(154));
+        previewStageParams.gravity = Gravity.TOP;
+        previewStageParams.topMargin = AndroidUtilities.dp(38);
+        previewStageParams.leftMargin = AndroidUtilities.dp(12);
+        previewStageParams.rightMargin = AndroidUtilities.dp(12);
+        previewCard.addView(previewStage, previewStageParams);
+
+        FrameLayout dialogPreview = new FrameLayout(context);
+        GradientDrawable dialogPreviewBackground = new GradientDrawable();
+        dialogPreviewBackground.setShape(GradientDrawable.RECTANGLE);
+        dialogPreviewBackground.setColor(ColorUtils.blendARGB(
+                Theme.getColor(Theme.key_dialogBackground),
+                Theme.getColor(Theme.key_windowBackgroundWhite),
+                isDarkTheme ? 0.14f : 0.08f
+        ));
+        dialogPreviewBackground.setStroke(AndroidUtilities.dp(1), ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhite), isDarkTheme ? 38 : 24));
+        FrameLayout.LayoutParams dialogPreviewParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(126));
+        dialogPreviewParams.gravity = Gravity.TOP;
+        dialogPreviewParams.topMargin = AndroidUtilities.dp(52);
+        dialogPreviewParams.leftMargin = AndroidUtilities.dp(28);
+        dialogPreviewParams.rightMargin = AndroidUtilities.dp(28);
+        dialogPreview.setBackground(dialogPreviewBackground);
+        previewCard.addView(dialogPreview, dialogPreviewParams);
+
+        TextView titleView = new TextView(context);
+        titleView.setText("Попробуйте позже");
+        titleView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+        titleView.setTextSize(18);
+        titleView.setTypeface(AndroidUtilities.bold());
+        FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        titleParams.topMargin = AndroidUtilities.dp(16);
+        dialogPreview.addView(titleView, titleParams);
+
+        TextView messageView = new TextView(context);
+        messageView.setText("Так будут выглядеть системные обращения и предупреждения.");
+        messageView.setTextColor(Theme.getColor(Theme.key_dialogTextGray3));
+        messageView.setTextSize(14);
+        messageView.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams messageParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        messageParams.gravity = Gravity.TOP;
+        messageParams.topMargin = AndroidUtilities.dp(46);
+        messageParams.leftMargin = AndroidUtilities.dp(18);
+        messageParams.rightMargin = AndroidUtilities.dp(18);
+        dialogPreview.addView(messageView, messageParams);
+
+        TextView okView = new TextView(context);
+        okView.setText("OK");
+        okView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        okView.setTextSize(14);
+        okView.setTypeface(AndroidUtilities.bold());
+        okView.setGravity(Gravity.CENTER);
+        okView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(
+                AndroidUtilities.dp(16),
+                ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 18 : 12),
+                ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 30 : 20)
+        ));
+        FrameLayout.LayoutParams okParams = new FrameLayout.LayoutParams(AndroidUtilities.dp(84), AndroidUtilities.dp(30));
+        okParams.gravity = Gravity.BOTTOM | Gravity.RIGHT;
+        okParams.rightMargin = AndroidUtilities.dp(14);
+        okParams.bottomMargin = AndroidUtilities.dp(12);
+        dialogPreview.addView(okView, okParams);
+
+        LinearLayout controlsRow = new LinearLayout(context);
+        controlsRow.setOrientation(LinearLayout.HORIZONTAL);
+        controlsRow.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams controlsRowParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        controlsRowParams.gravity = Gravity.TOP;
+        controlsRowParams.topMargin = AndroidUtilities.dp(204);
+        controlsRowParams.leftMargin = AndroidUtilities.dp(18);
+        controlsRowParams.rightMargin = AndroidUtilities.dp(18);
+        previewCard.addView(controlsRow, controlsRowParams);
+
+        TextView resetView = new TextView(context);
+        resetView.setText("Сбросить");
+        resetView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        resetView.setTextSize(14);
+        resetView.setTypeface(AndroidUtilities.bold());
+        resetView.setGravity(Gravity.CENTER);
+        resetView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(
+                AndroidUtilities.dp(14),
+                ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 16 : 12),
+                ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 28 : 20)
+        ));
+        LinearLayout.LayoutParams resetParams = new LinearLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(30));
+        controlsRow.addView(resetView, resetParams);
+
+        View controlsSpacer = new View(context);
+        LinearLayout.LayoutParams controlsSpacerParams = new LinearLayout.LayoutParams(0, 1, 1f);
+        controlsRow.addView(controlsSpacer, controlsSpacerParams);
+
+        TextView valueView = new TextView(context);
+        valueView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        valueView.setTextSize(13);
+        valueView.setTypeface(AndroidUtilities.bold());
+        controlsRow.addView(valueView);
+
+        SeekBarView seekBarView = new SeekBarView(context, resourceProvider);
+        seekBarView.setReportChanges(true);
+        seekBarView.setColors(
+                ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 44 : 30),
+                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText)
+        );
+        FrameLayout.LayoutParams seekBarParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(40));
+        seekBarParams.gravity = Gravity.BOTTOM;
+        seekBarParams.leftMargin = AndroidUtilities.dp(16);
+        seekBarParams.rightMargin = AndroidUtilities.dp(16);
+        seekBarParams.bottomMargin = AndroidUtilities.dp(18);
+        previewCard.addView(seekBarView, seekBarParams);
+
+        Runnable updatePreview = () -> {
+            int radiusDp = MessagesController.getGlobalMainSettings().getInt(PREF_DIALOG_CORNER_RADIUS, DEFAULT_DIALOG_CORNER_RADIUS_DP);
+            radiusDp = Math.max(MIN_DIALOG_CORNER_RADIUS_DP, Math.min(MAX_DIALOG_CORNER_RADIUS_DP, radiusDp));
+            dialogPreviewBackground.setCornerRadius(AndroidUtilities.dp(radiusDp));
+            seekBarView.setProgress((radiusDp - MIN_DIALOG_CORNER_RADIUS_DP) / (float) (MAX_DIALOG_CORNER_RADIUS_DP - MIN_DIALOG_CORNER_RADIUS_DP));
+            valueView.setText(radiusDp == DEFAULT_DIALOG_CORNER_RADIUS_DP ? "По умолчанию" : radiusDp + " dp");
+            resetView.setAlpha(radiusDp == DEFAULT_DIALOG_CORNER_RADIUS_DP ? 0.65f : 1f);
+        };
+
+        seekBarView.setDelegate(new SeekBarView.SeekBarViewDelegate() {
+            @Override
+            public void onSeekBarDrag(boolean stop, float progress) {
+                int radiusDp = MIN_DIALOG_CORNER_RADIUS_DP + Math.round((MAX_DIALOG_CORNER_RADIUS_DP - MIN_DIALOG_CORNER_RADIUS_DP) * progress);
+                MessagesController.getGlobalMainSettings().edit().putInt(PREF_DIALOG_CORNER_RADIUS, radiusDp).apply();
+                updatePreview.run();
+            }
+        });
+
+        resetView.setOnClickListener(v -> {
+            MessagesController.getGlobalMainSettings().edit().putInt(PREF_DIALOG_CORNER_RADIUS, DEFAULT_DIALOG_CORNER_RADIUS_DP).apply();
+            updatePreview.run();
+        });
+
+        updatePreview.run();
     }
 
     private void addGhostContent(Context context, FrameLayout contentView, boolean isDarkTheme) {
