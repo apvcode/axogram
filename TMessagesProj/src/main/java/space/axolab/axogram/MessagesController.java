@@ -18918,6 +18918,11 @@ public class MessagesController extends BaseController implements NotificationCe
 //                    updatesOnMainThread = new ArrayList<>();
 //                }
 //                updatesOnMainThread.add(baseUpdate);
+            } else if (baseUpdate instanceof TLRPC.TL_updateLoginToken) {
+                if (updatesOnMainThread == null) {
+                    updatesOnMainThread = new ArrayList<>();
+                }
+                updatesOnMainThread.add(baseUpdate);
             } else {
                 if (updatesOnMainThread == null) {
                     updatesOnMainThread = new ArrayList<>();
@@ -19038,6 +19043,8 @@ public class MessagesController extends BaseController implements NotificationCe
                         } else if (update.key instanceof TLRPC.TL_privacyKeyStarGiftsAutoSave) {
                             getContactsController().setPrivacyRules(update.rules, ContactsController.PRIVACY_RULES_TYPE_GIFTS);
                         }
+                    } else if (baseUpdate instanceof TLRPC.TL_updateLoginToken) {
+                        getNotificationCenter().postNotificationName(NotificationCenter.qrLoginTokenUpdated);
                     } else if (baseUpdate instanceof TLRPC.TL_updateStarGiftAuctionState) {
                         GiftAuctionController.getInstance(currentAccount).processUpdate((TLRPC.TL_updateStarGiftAuctionState) baseUpdate);
                     } else if (baseUpdate instanceof TLRPC.TL_updateStarGiftAuctionUserState) {

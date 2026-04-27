@@ -26,6 +26,7 @@ import android.app.Activity;
 import android.app.Dialog;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
@@ -114,6 +115,9 @@ import com.google.android.play.core.integrity.IntegrityManager;
 import com.google.android.play.core.integrity.IntegrityManagerFactory;
 import com.google.android.play.core.integrity.IntegrityTokenRequest;
 import com.google.android.play.core.integrity.IntegrityTokenResponse;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.qrcode.QRCodeWriter;
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -152,6 +156,7 @@ import space.axolab.axogram.tgnet.tl.TL_account;
 import space.axolab.axogram.ui.ActionBar.ActionBar;
 import space.axolab.axogram.ui.ActionBar.AlertDialog;
 import space.axolab.axogram.ui.ActionBar.BaseFragment;
+import space.axolab.axogram.ui.ActionBar.BottomSheet;
 import space.axolab.axogram.ui.ActionBar.Theme;
 import space.axolab.axogram.ui.ActionBar.ThemeDescription;
 import space.axolab.axogram.ui.Cells.CheckBoxCell;
@@ -179,6 +184,7 @@ import space.axolab.axogram.ui.Components.Premium.GLIcon.GLIconTextureView;
 import space.axolab.axogram.ui.Components.Premium.GLIcon.Icon3D;
 import space.axolab.axogram.ui.Components.Premium.StarParticlesView;
 import space.axolab.axogram.ui.Components.ProxyDrawable;
+import space.axolab.axogram.ui.Components.QRCodeBottomSheet;
 import space.axolab.axogram.ui.Components.RLottieDrawable;
 import space.axolab.axogram.ui.Components.RLottieImageView;
 import space.axolab.axogram.ui.Components.RadialProgressView;
@@ -322,6 +328,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private boolean paid;
 
     private boolean restoringState;
+    private QRCodeBottomSheet qrLoginBottomSheet;
+    private int qrLoginRequestId;
+    private Runnable qrLoginRefreshRunnable;
 
     private Dialog permissionsDialog;
     private Dialog permissionsShowDialog;
@@ -508,6 +517,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
+        cancelQrLoginFlow();
+        if (qrLoginBottomSheet != null) {
+            qrLoginBottomSheet.dismiss();
+            qrLoginBottomSheet = null;
+        }
         for (int a = 0; a < views.length; a++) {
             if (views[a] != null) {
                 views[a].onDestroyActivity();
@@ -524,13 +538,202 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         }
         getNotificationCenter().removeObserver(this, NotificationCenter.didUpdateConnectionState);
         getNotificationCenter().removeObserver(this, NotificationCenter.newSuggestionsAvailable);
+        getNotificationCenter().removeObserver(this, NotificationCenter.qrLoginTokenUpdated);
     }
 
     @Override
     public boolean onFragmentCreate() {
         getNotificationCenter().addObserver(this, NotificationCenter.didUpdateConnectionState);
         getNotificationCenter().addObserver(this, NotificationCenter.newSuggestionsAvailable);
+        getNotificationCenter().addObserver(this, NotificationCenter.qrLoginTokenUpdated);
         return super.onFragmentCreate();
+    }
+
+    private void cancelQrLoginFlow() {
+        if (qrLoginRequestId != 0) {
+            getConnectionsManager().cancelRequest(qrLoginRequestId, true);
+            qrLoginRequestId = 0;
+        }
+        if (qrLoginRefreshRunnable != null) {
+            AndroidUtilities.cancelRunOnUIThread(qrLoginRefreshRunnable);
+            qrLoginRefreshRunnable = null;
+        }
+    }
+
+    private void scheduleQrLoginRefresh() {
+        if (qrLoginBottomSheet == null) {
+            return;
+        }
+        if (qrLoginRefreshRunnable != null) {
+            AndroidUtilities.cancelRunOnUIThread(qrLoginRefreshRunnable);
+        }
+        qrLoginRefreshRunnable = () -> {
+            if (qrLoginBottomSheet != null) {
+                requestQrLoginToken(false);
+            }
+        };
+        AndroidUtilities.runOnUIThread(qrLoginRefreshRunnable, 45_000L);
+    }
+
+    private void finishQrLoginFlow(Runnable action) {
+        cancelQrLoginFlow();
+        if (qrLoginBottomSheet != null) {
+            QRCodeBottomSheet bottomSheet = qrLoginBottomSheet;
+            qrLoginBottomSheet = null;
+            bottomSheet.setOnDismissListener((DialogInterface.OnDismissListener) null);
+            bottomSheet.dismiss();
+        }
+        AndroidUtilities.runOnUIThread(action);
+    }
+
+    private boolean handleQrPasswordNeeded(TLRPC.TL_error error) {
+        if (error == null || error.text == null || !error.text.contains("SESSION_PASSWORD_NEEDED")) {
+            return false;
+        }
+        TL_account.getPassword req = new TL_account.getPassword();
+        ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error1) -> AndroidUtilities.runOnUIThread(() -> {
+            if (error1 == null) {
+                TL_account.Password password = (TL_account.Password) response;
+                if (!TwoStepVerificationActivity.canHandleCurrentPassword(password, true)) {
+                    AlertsCreator.showUpdateAppAlert(getParentActivity(), getString("UpdateAppAlert", R.string.UpdateAppAlert), true);
+                    return;
+                }
+                Bundle bundle = new Bundle();
+                SerializedData data = new SerializedData(password.getObjectSize());
+                password.serializeToStream(data);
+                bundle.putString("password", Utilities.bytesToHex(data.toByteArray()));
+                finishQrLoginFlow(() -> setPage(VIEW_PASSWORD, true, bundle, false));
+            } else {
+                needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), error1.text);
+            }
+        }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin);
+        return true;
+    }
+
+    private void showQrLoginSheet() {
+        if (getParentActivity() == null || activityMode != MODE_LOGIN) {
+            return;
+        }
+        requestQrLoginToken(true);
+    }
+
+    private void requestQrLoginToken(boolean recreateBottomSheet) {
+        if (getParentActivity() == null || activityMode != MODE_LOGIN) {
+            return;
+        }
+        if (qrLoginRequestId != 0) {
+            getConnectionsManager().cancelRequest(qrLoginRequestId, true);
+            qrLoginRequestId = 0;
+        }
+        TLRPC.TL_auth_exportLoginToken req = new TLRPC.TL_auth_exportLoginToken();
+        req.api_id = BuildVars.APP_ID;
+        req.api_hash = BuildVars.APP_HASH;
+        qrLoginRequestId = getConnectionsManager().sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+            qrLoginRequestId = 0;
+            if (error != null) {
+                if (handleQrPasswordNeeded(error)) {
+                    return;
+                }
+                needShowAlert(getString(R.string.AppName), getString(R.string.ErrorOccurred) + "\n" + error.text);
+                return;
+            }
+            if (!(response instanceof TLRPC.auth_LoginToken)) {
+                needShowAlert(getString(R.string.AppName), getString(R.string.ErrorOccurred));
+                return;
+            }
+            processQrLoginTokenResponse((TLRPC.auth_LoginToken) response, recreateBottomSheet);
+        }), ConnectionsManager.RequestFlagWithoutLogin);
+    }
+
+    private void processQrLoginTokenResponse(TLRPC.auth_LoginToken response, boolean recreateBottomSheet) {
+        if (response instanceof TLRPC.TL_auth_loginToken) {
+            TLRPC.TL_auth_loginToken loginToken = (TLRPC.TL_auth_loginToken) response;
+            String qrLink = "tg://login?token=" + Base64.encodeToString(loginToken.token, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+            if (qrLoginBottomSheet == null || recreateBottomSheet) {
+                if (qrLoginBottomSheet != null) {
+                    qrLoginBottomSheet.dismiss();
+                }
+                qrLoginBottomSheet = new QRCodeBottomSheet(
+                        getParentActivity(),
+                        getString(R.string.AuthAnotherClient),
+                        qrLink,
+                        getString(R.string.AuthAnotherClientUrl),
+                        false,
+                        resourceProvider
+                );
+                qrLoginBottomSheet.setCenterImage(R.drawable.axogram_logo_app_white_nobg);
+                qrLoginBottomSheet.setOnDismissListener(dialog -> {
+                    cancelQrLoginFlow();
+                    qrLoginBottomSheet = null;
+                });
+                showDialog(qrLoginBottomSheet);
+            } else {
+                qrLoginBottomSheet.updateLink(qrLink);
+            }
+            scheduleQrLoginRefresh();
+        } else if (response instanceof TLRPC.TL_auth_loginTokenMigrateTo) {
+            TLRPC.TL_auth_loginTokenMigrateTo migrateTo = (TLRPC.TL_auth_loginTokenMigrateTo) response;
+            importQrLoginToken(migrateTo.token, migrateTo.dc_id);
+        } else if (response instanceof TLRPC.TL_auth_loginTokenSuccess) {
+            TLRPC.auth_Authorization authorization = ((TLRPC.TL_auth_loginTokenSuccess) response).authorization;
+            if (authorization instanceof TLRPC.TL_auth_authorization) {
+                finishQrLoginFlow(() -> onAuthSuccess((TLRPC.TL_auth_authorization) authorization));
+            } else {
+                needShowAlert(getString(R.string.AppName), getString(R.string.ErrorOccurred));
+            }
+        }
+    }
+
+    private void importQrLoginToken(byte[] token, int dcId) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        if (qrLoginRequestId != 0) {
+            getConnectionsManager().cancelRequest(qrLoginRequestId, true);
+            qrLoginRequestId = 0;
+        }
+        TLRPC.TL_auth_importLoginToken req = new TLRPC.TL_auth_importLoginToken();
+        req.token = token;
+        RequestDelegate requestDelegate = (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+            qrLoginRequestId = 0;
+            if (error != null) {
+                if (handleQrPasswordNeeded(error)) {
+                    return;
+                }
+                if (error.text != null && error.text.contains("AUTH_TOKEN_EXPIRED")) {
+                    requestQrLoginToken(false);
+                    return;
+                }
+                needShowAlert(getString(R.string.AppName), getString(R.string.ErrorOccurred) + "\n" + error.text);
+                return;
+            }
+            if (response instanceof TLRPC.auth_LoginToken) {
+                processQrLoginTokenResponse((TLRPC.auth_LoginToken) response, false);
+            } else if (response instanceof TLRPC.TL_auth_authorization) {
+                finishQrLoginFlow(() -> onAuthSuccess((TLRPC.TL_auth_authorization) response));
+            } else {
+                needShowAlert(getString(R.string.AppName), getString(R.string.ErrorOccurred));
+            }
+        });
+        if (dcId == ConnectionsManager.DEFAULT_DATACENTER_ID) {
+            qrLoginRequestId = getConnectionsManager().sendRequest(
+                    req,
+                    requestDelegate,
+                    ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin
+            );
+        } else {
+            qrLoginRequestId = getConnectionsManager().sendRequest(
+                    req,
+                    requestDelegate,
+                    null,
+                    null,
+                    null,
+                    ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin | ConnectionsManager.RequestFlagTryDifferentDc,
+                    dcId,
+                    ConnectionsManager.ConnectionTypeGeneric,
+                    true
+            );
+        }
     }
 
     private View cachedFragmentView;
@@ -2027,6 +2230,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         private TextViewSwitcher countryButton;
         private OutlineTextContainerView countryOutlineView;
         private OutlineTextContainerView phoneOutlineView;
+        private ImageView qrLoginButton;
         private TextView plusTextView;
         private LinkSpanDrawable.LinksTextView subtitleView;
         private View codeDividerView;
@@ -2170,9 +2374,19 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             linearLayout.setOrientation(HORIZONTAL);
 
             phoneOutlineView = new OutlineTextContainerView(context);
-            phoneOutlineView.addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 16, 8, 16, 8));
+            phoneOutlineView.addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 16, 8, activityMode == MODE_LOGIN ? 64 : 16, 8));
             phoneOutlineView.setText(getString(R.string.PhoneNumber));
             addView(phoneOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 58, 16, 8, 16, 8));
+            if (activityMode == MODE_LOGIN) {
+                qrLoginButton = new ImageView(context);
+                qrLoginButton.setImageResource(R.drawable.msg_qrcode);
+                qrLoginButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                qrLoginButton.setPadding(dp(8), dp(8), dp(8), dp(8));
+                qrLoginButton.setContentDescription(getString(R.string.AuthAnotherClient));
+                qrLoginButton.setOnClickListener(v -> showQrLoginSheet());
+                phoneOutlineView.addView(qrLoginButton, LayoutHelper.createFrame(42, 42, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 8, 0));
+                qrLoginButton.bringToFront();
+            }
 
             plusTextView = new TextView(context);
             plusTextView.setText("+");
@@ -2749,6 +2963,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             chevronRight.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 1));
 
             plusTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            if (qrLoginButton != null) {
+                qrLoginButton.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+                qrLoginButton.setBackground(Theme.createSelectorDrawable(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), 28), 1));
+            }
 
             codeField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             codeField.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated));
@@ -8878,6 +9096,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         } else if (id == NotificationCenter.newSuggestionsAvailable) {
             if (emailChangeIsSuggestion && !getMessagesController().hasSetupEmailSuggestion()) {
                 finishFragment();
+            }
+        } else if (id == NotificationCenter.qrLoginTokenUpdated) {
+            if (activityMode == MODE_LOGIN && qrLoginBottomSheet != null) {
+                requestQrLoginToken(false);
             }
         }
     }

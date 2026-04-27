@@ -494,74 +494,56 @@ public class AxoGramEmptyFragment extends BaseFragment {
     }
 
     private View createSectionRow(Context context, int iconRes, String title, Runnable onClick) {
-        FrameLayout rowLayout = new FrameLayout(context);
+        LinearLayout rowLayout = new LinearLayout(context);
+        rowLayout.setOrientation(LinearLayout.VERTICAL);
         rowLayout.setClickable(true);
         rowLayout.setFocusable(true);
         rowLayout.setOnClickListener(v -> onClick.run());
-
-        int rowDefaultColor = ColorUtils.blendARGB(
-                Theme.getColor(Theme.key_windowBackgroundWhite),
-                Theme.getColor(Theme.key_windowBackgroundGray),
-                Theme.isCurrentThemeDark() ? 0.16f : 0.05f
-        );
-        int rowPressedColor = ColorUtils.blendARGB(
-                rowDefaultColor,
-                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText),
-                Theme.isCurrentThemeDark() ? 0.12f : 0.08f
-        );
-        rowLayout.setBackground(Theme.createSimpleSelectorRoundRectDrawable(
-                AndroidUtilities.dp(22),
-                rowDefaultColor,
-                rowPressedColor
-        ));
+        rowLayout.setBackground(Theme.createSelectorDrawable(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), 20), Theme.RIPPLE_MASK_ALL));
         LinearLayout.LayoutParams rowLayoutParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                AndroidUtilities.dp(58)
+                LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        rowLayoutParams.bottomMargin = AndroidUtilities.dp(8);
+        rowLayoutParams.bottomMargin = AndroidUtilities.dp(2);
         rowLayout.setLayoutParams(rowLayoutParams);
 
         LinearLayout contentLayout = new LinearLayout(context);
         contentLayout.setOrientation(LinearLayout.HORIZONTAL);
         contentLayout.setGravity(Gravity.CENTER_VERTICAL);
-        contentLayout.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(0), AndroidUtilities.dp(12), AndroidUtilities.dp(0));
-        rowLayout.addView(contentLayout, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        contentLayout.setPadding(AndroidUtilities.dp(2), AndroidUtilities.dp(12), AndroidUtilities.dp(2), AndroidUtilities.dp(12));
+        rowLayout.addView(contentLayout, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        GradientDrawable iconPillDrawable = new GradientDrawable();
-        iconPillDrawable.setShape(GradientDrawable.RECTANGLE);
-        iconPillDrawable.setCornerRadius(AndroidUtilities.dp(16));
-        iconPillDrawable.setColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), Theme.isCurrentThemeDark() ? 20 : 12));
         FrameLayout iconHolder = new FrameLayout(context);
-        iconHolder.setBackground(iconPillDrawable);
-        LinearLayout.LayoutParams iconHolderLayoutParams = new LinearLayout.LayoutParams(AndroidUtilities.dp(34), AndroidUtilities.dp(34));
-        iconHolderLayoutParams.rightMargin = AndroidUtilities.dp(12);
+        LinearLayout.LayoutParams iconHolderLayoutParams = new LinearLayout.LayoutParams(AndroidUtilities.dp(42), AndroidUtilities.dp(42));
+        iconHolderLayoutParams.rightMargin = AndroidUtilities.dp(14);
         contentLayout.addView(iconHolder, iconHolderLayoutParams);
 
         ImageView iconView = new ImageView(context);
         iconView.setImageResource(iconRes);
-        iconView.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        iconView.setColorFilter(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhite), 150));
         iconView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        FrameLayout.LayoutParams iconFrameLayoutParams = new FrameLayout.LayoutParams(AndroidUtilities.dp(20), AndroidUtilities.dp(20), Gravity.CENTER);
+        FrameLayout.LayoutParams iconFrameLayoutParams = new FrameLayout.LayoutParams(AndroidUtilities.dp(26), AndroidUtilities.dp(26), Gravity.CENTER);
         iconHolder.addView(iconView, iconFrameLayoutParams);
 
         TextView titleView = new TextView(context);
         titleView.setText(title);
         titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-        titleView.setTextSize(16);
+        titleView.setTextSize(18);
         titleView.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MEDIUM));
-        LinearLayout.LayoutParams titleLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams titleLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         contentLayout.addView(titleView, titleLayoutParams);
 
         TextView chevronView = new TextView(context);
         chevronView.setText("›");
-        chevronView.setTextColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4), 135));
-        chevronView.setTextSize(19);
-        LinearLayout.LayoutParams chevronLayoutParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        chevronLayoutParams.gravity = Gravity.CENTER_VERTICAL;
-        chevronLayoutParams.leftMargin = AndroidUtilities.dp(12);
-        View spacerView = new View(context);
-        contentLayout.addView(spacerView, chevronLayoutParams);
+        chevronView.setTextColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4), 110));
+        chevronView.setTextSize(21);
         contentLayout.addView(chevronView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        View dividerView = new View(context);
+        dividerView.setBackgroundColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhite), 16));
+        LinearLayout.LayoutParams dividerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, AndroidUtilities.dp(0.66f)));
+        dividerLayoutParams.leftMargin = AndroidUtilities.dp(56);
+        rowLayout.addView(dividerView, dividerLayoutParams);
 
         return rowLayout;
     }

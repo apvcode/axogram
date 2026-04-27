@@ -83,6 +83,7 @@ public class NotificationCenter {
     public static final int replyMessagesDidLoad = totalEvents++;
     public static final int didLoadPinnedMessages = totalEvents++;
     public static final int newSessionReceived = totalEvents++;
+    public static final int qrLoginTokenUpdated = totalEvents++;
     public static final int didReceivedWebpages = totalEvents++;
     public static final int didReceivedWebpagesInUpdates = totalEvents++;
     public static final int stickersDidLoad = totalEvents++;

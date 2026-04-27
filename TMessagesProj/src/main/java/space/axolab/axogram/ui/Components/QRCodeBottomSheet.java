@@ -37,11 +37,13 @@ import java.util.HashMap;
 public class QRCodeBottomSheet extends BottomSheet {
 
     Bitmap qrCode;
+    private String link;
     private final TextView help;
     private final TextView buttonTextView;
     private TextView button2TextView;
     int imageSize;
     RLottieImageView iconImage;
+    private final ImageView imageView;
 
     public QRCodeBottomSheet(Context context, String title, String link, String helpMessage, boolean includeShareLink) {
         this(context, title, link, helpMessage, includeShareLink, null);
@@ -49,9 +51,10 @@ public class QRCodeBottomSheet extends BottomSheet {
     public QRCodeBottomSheet(Context context, String title, String link, String helpMessage, boolean includeShareLink, Theme.ResourcesProvider resourcesProvider) {
         super(context, false, resourcesProvider);
         fixNavigationBar();
+        this.link = link;
 
         setTitle(title, true);
-        ImageView imageView = new ImageView(context) {
+        imageView = new ImageView(context) {
             @Override
             protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                 int size = MeasureSpec.getSize(widthMeasureSpec);
@@ -135,7 +138,7 @@ public class QRCodeBottomSheet extends BottomSheet {
             button2TextView.setOnClickListener(view -> {
                 Intent shareIntent = new Intent(Intent.ACTION_SEND);
                 shareIntent.setType("text/plain");
-                shareIntent.putExtra(Intent.EXTRA_TEXT, link);
+                shareIntent.putExtra(Intent.EXTRA_TEXT, this.link);
                 Intent chooserIntent = Intent.createChooser(shareIntent, LocaleController.getString(R.string.ShareLink));
                 chooserIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(chooserIntent);
@@ -180,6 +183,14 @@ public class QRCodeBottomSheet extends BottomSheet {
 
     public void setCenterImage(Bitmap bitmap) {
         iconImage.setImageBitmap(bitmap);
+    }
+
+    public void updateLink(String link) {
+        if (link == null || link.equals(this.link)) {
+            return;
+        }
+        this.link = link;
+        imageView.setImageBitmap(qrCode = createQR(imageView.getContext(), link, qrCode));
     }
 
     void updateColors() {
