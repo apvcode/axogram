@@ -193,11 +193,16 @@ public class QRCodeBottomSheet extends BottomSheet {
     }
 
     void updateColors() {
-        buttonTextView.setTextColor(getThemedColor(Theme.key_featuredStickers_buttonText));
-        buttonTextView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(24), getThemedColor(Theme.key_featuredStickers_addButton), getThemedColor(Theme.key_featuredStickers_addButtonPressed)));
+        int accentColor = getThemedColor(Theme.key_featuredStickers_addButton);
+        buttonTextView.setTextColor(accentColor);
+        buttonTextView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(
+                AndroidUtilities.dp(24),
+                ColorUtils.setAlphaComponent(accentColor, 28),
+                ColorUtils.setAlphaComponent(accentColor, 52)
+        ));
         if (button2TextView != null) {
-            button2TextView.setTextColor(getThemedColor(Theme.key_featuredStickers_addButton));
-            button2TextView.setBackground(Theme.createSelectorDrawable(ColorUtils.setAlphaComponent(getThemedColor(Theme.key_featuredStickers_addButton), Math.min(255, Color.alpha(getThemedColor(Theme.key_listSelector)) * 2)), Theme.RIPPLE_MASK_ROUNDRECT_6DP));
+            button2TextView.setTextColor(accentColor);
+            button2TextView.setBackground(Theme.createSelectorDrawable(ColorUtils.setAlphaComponent(accentColor, Math.min(255, Color.alpha(getThemedColor(Theme.key_listSelector)) * 2)), Theme.RIPPLE_MASK_ROUNDRECT_6DP));
         }
         help.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
         help.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
