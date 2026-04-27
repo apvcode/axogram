@@ -339,7 +339,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private boolean checkPermissions = true;
     private boolean checkShowPermissions = true;
     private boolean newAccount;
-    private boolean syncContacts = true;
+    private boolean syncContacts = false;
     private boolean testBackend = false;
 
     @ActivityMode
@@ -617,14 +617,45 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         requestQrLoginToken(true);
     }
 
-    private void requestQrLoginToken(boolean recreateBottomSheet) {
-        if (getParentActivity() == null || activityMode != MODE_LOGIN) {
-            return;
-        }
+    private void cancelQrLoginRequest() {
         if (qrLoginRequestId != 0) {
             getConnectionsManager().cancelRequest(qrLoginRequestId, true);
             qrLoginRequestId = 0;
         }
+    }
+
+    private void showOrUpdateQrLoginSheet(String qrLink, boolean recreateBottomSheet) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        if (qrLoginBottomSheet == null || recreateBottomSheet) {
+            if (qrLoginBottomSheet != null) {
+                qrLoginBottomSheet.dismiss();
+            }
+            qrLoginBottomSheet = new QRCodeBottomSheet(
+                    getParentActivity(),
+                    getString(R.string.AuthAnotherClient),
+                    qrLink,
+                    getString(R.string.AuthAnotherClientUrl),
+                    false,
+                    resourceProvider
+            );
+            qrLoginBottomSheet.setCenterImage(R.drawable.axogram_logo_app_white_nobg);
+            qrLoginBottomSheet.setOnDismissListener(dialog -> {
+                cancelQrLoginFlow();
+                qrLoginBottomSheet = null;
+            });
+            showDialog(qrLoginBottomSheet);
+        } else {
+            qrLoginBottomSheet.updateLink(qrLink);
+        }
+    }
+
+    private void requestQrLoginToken(boolean recreateBottomSheet) {
+        if (getParentActivity() == null || activityMode != MODE_LOGIN) {
+            return;
+        }
+        cancelQrLoginRequest();
         TLRPC.TL_auth_exportLoginToken req = new TLRPC.TL_auth_exportLoginToken();
         req.api_id = BuildVars.APP_ID;
         req.api_hash = BuildVars.APP_HASH;
@@ -649,27 +680,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         if (response instanceof TLRPC.TL_auth_loginToken) {
             TLRPC.TL_auth_loginToken loginToken = (TLRPC.TL_auth_loginToken) response;
             String qrLink = "tg://login?token=" + Base64.encodeToString(loginToken.token, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
-            if (qrLoginBottomSheet == null || recreateBottomSheet) {
-                if (qrLoginBottomSheet != null) {
-                    qrLoginBottomSheet.dismiss();
-                }
-                qrLoginBottomSheet = new QRCodeBottomSheet(
-                        getParentActivity(),
-                        getString(R.string.AuthAnotherClient),
-                        qrLink,
-                        getString(R.string.AuthAnotherClientUrl),
-                        false,
-                        resourceProvider
-                );
-                qrLoginBottomSheet.setCenterImage(R.drawable.axogram_logo_app_white_nobg);
-                qrLoginBottomSheet.setOnDismissListener(dialog -> {
-                    cancelQrLoginFlow();
-                    qrLoginBottomSheet = null;
-                });
-                showDialog(qrLoginBottomSheet);
-            } else {
-                qrLoginBottomSheet.updateLink(qrLink);
-            }
+            showOrUpdateQrLoginSheet(qrLink, recreateBottomSheet);
             scheduleQrLoginRefresh();
         } else if (response instanceof TLRPC.TL_auth_loginTokenMigrateTo) {
             TLRPC.TL_auth_loginTokenMigrateTo migrateTo = (TLRPC.TL_auth_loginTokenMigrateTo) response;
@@ -688,10 +699,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         if (getParentActivity() == null) {
             return;
         }
-        if (qrLoginRequestId != 0) {
-            getConnectionsManager().cancelRequest(qrLoginRequestId, true);
-            qrLoginRequestId = 0;
-        }
+        cancelQrLoginRequest();
         TLRPC.TL_auth_importLoginToken req = new TLRPC.TL_auth_importLoginToken();
         req.token = token;
         RequestDelegate requestDelegate = (response, error) -> AndroidUtilities.runOnUIThread(() -> {
@@ -906,7 +914,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         }
         if (savedInstanceState != null) {
             currentViewNum = savedInstanceState.getInt("currentViewNum", 0);
-            syncContacts = savedInstanceState.getInt("syncContacts", 1) == 1;
+            syncContacts = savedInstanceState.getInt("syncContacts", 0) == 1;
             if (currentViewNum >= VIEW_CODE_MESSAGE && currentViewNum <= VIEW_CODE_CALL) {
                 int time = savedInstanceState.getInt("open");
                 if (time != 0 && Math.abs(System.currentTimeMillis() / 1000 - time) >= 24 * 60 * 60) {

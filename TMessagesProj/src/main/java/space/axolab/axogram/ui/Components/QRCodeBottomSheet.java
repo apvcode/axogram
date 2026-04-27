@@ -1,11 +1,19 @@
 package space.axolab.axogram.ui.Components;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Outline;
+import android.graphics.Paint;
+import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
@@ -44,6 +52,8 @@ public class QRCodeBottomSheet extends BottomSheet {
     int imageSize;
     RLottieImageView iconImage;
     private final ImageView imageView;
+    private final QRRevealOverlayView qrRevealOverlayView;
+    private ValueAnimator qrRevealAnimator;
 
     public QRCodeBottomSheet(Context context, String title, String link, String helpMessage, boolean includeShareLink) {
         this(context, title, link, helpMessage, includeShareLink, null);
@@ -97,6 +107,8 @@ public class QRCodeBottomSheet extends BottomSheet {
             }
         };
         frameLayout.addView(imageView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        qrRevealOverlayView = new QRRevealOverlayView(context);
+        frameLayout.addView(qrRevealOverlayView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         frameLayout.addView(iconImage, LayoutHelper.createFrame(60, 60, Gravity.CENTER));
         linearLayout.addView(frameLayout, LayoutHelper.createLinear(220, 220, Gravity.CENTER_HORIZONTAL, 30, 0,30 ,0));
 
@@ -150,6 +162,7 @@ public class QRCodeBottomSheet extends BottomSheet {
         ScrollView scrollView = new ScrollView(context);
         scrollView.addView(linearLayout);
         setCustomView(scrollView);
+        animateQrReveal(true);
     }
 
     public Bitmap createQR(Context context, String key, Bitmap oldBitmap) {
@@ -191,6 +204,7 @@ public class QRCodeBottomSheet extends BottomSheet {
         }
         this.link = link;
         imageView.setImageBitmap(qrCode = createQR(imageView.getContext(), link, qrCode));
+        animateQrReveal(false);
     }
 
     void updateColors() {
@@ -206,5 +220,83 @@ public class QRCodeBottomSheet extends BottomSheet {
             getTitleView().setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
         }
         setBackgroundColor(getThemedColor(Theme.key_dialogBackground));
+    }
+
+    private void animateQrReveal(boolean firstShow) {
+        if (qrRevealAnimator != null) {
+            qrRevealAnimator.cancel();
+        }
+        imageView.setAlpha(firstShow ? 0.18f : 0.34f);
+        imageView.setScaleX(firstShow ? 0.78f : 0.86f);
+        imageView.setScaleY(firstShow ? 0.78f : 0.86f);
+        imageView.setTranslationY(firstShow ? AndroidUtilities.dp(18) : AndroidUtilities.dp(10));
+        qrRevealOverlayView.setRevealProgress(0f);
+        qrRevealOverlayView.setVisibility(View.VISIBLE);
+        qrRevealAnimator = ValueAnimator.ofFloat(0f, 1f);
+        qrRevealAnimator.setDuration(firstShow ? 1120L : 820L);
+        qrRevealAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+        qrRevealAnimator.addUpdateListener(animation -> {
+            float progress = (float) animation.getAnimatedValue();
+            qrRevealOverlayView.setRevealProgress(progress);
+            imageView.setAlpha(firstShow ? (0.18f + 0.82f * progress) : (0.34f + 0.66f * progress));
+            float scale = firstShow ? (0.78f + 0.22f * progress) : (0.86f + 0.14f * progress);
+            imageView.setScaleX(scale);
+            imageView.setScaleY(scale);
+            imageView.setTranslationY((firstShow ? AndroidUtilities.dp(18) : AndroidUtilities.dp(10)) * (1f - progress));
+        });
+        qrRevealAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                qrRevealOverlayView.setRevealProgress(1f);
+                qrRevealOverlayView.setVisibility(View.GONE);
+                imageView.setAlpha(1f);
+                imageView.setScaleX(1f);
+                imageView.setScaleY(1f);
+                imageView.setTranslationY(0f);
+            }
+        });
+        qrRevealAnimator.start();
+    }
+
+    private static class QRRevealOverlayView extends View {
+
+        private final Paint overlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rect = new RectF();
+        private float revealProgress = 1f;
+
+        public QRRevealOverlayView(Context context) {
+            super(context);
+            overlayPaint.setColor(0xff202b3d);
+        }
+
+        public void setRevealProgress(float revealProgress) {
+            this.revealProgress = revealProgress;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            float width = getWidth();
+            float height = getHeight();
+            if (width <= 0 || height <= 0 || revealProgress >= 1f) {
+                return;
+            }
+            float revealY = height * revealProgress;
+            rect.set(0, revealY, width, height);
+            overlayPaint.setAlpha((int) (255 * (1f - revealProgress)));
+            canvas.drawRect(rect, overlayPaint);
+
+            float lineTop = Math.max(0, revealY - AndroidUtilities.dp(34));
+            float lineBottom = Math.min(height, revealY + AndroidUtilities.dp(34));
+            linePaint.setShader(new LinearGradient(
+                    0, lineTop, 0, lineBottom,
+                    new int[] {0x00000000, 0x66a8d9ff, 0xffffffff, 0x66a8d9ff, 0x00000000},
+                    new float[] {0f, 0.22f, 0.5f, 0.78f, 1f},
+                    Shader.TileMode.CLAMP
+            ));
+            canvas.drawRect(0, lineTop, width, lineBottom, linePaint);
+            linePaint.setShader(null);
+        }
     }
 }
