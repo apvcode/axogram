@@ -250,6 +250,10 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     public final static String EXTRA_FORCE_NOT_INTERNAL_APPS = "force_not_internal_apps";
     public final static String EXTRA_FORCE_REQUEST = "force_request";
     public final static Pattern PREFIX_T_ME_PATTERN = Pattern.compile("^(?:http(?:s|)://|)([A-z0-9-]+?)\\.t\\.me");
+    private static final String ACTION_GHOST_LOGIN = "space.axolab.axogram.GHOST_LOGIN";
+    private static final String PREF_GHOST_ONLINE = "axogram_ghost_hide_online";
+    private static final String PREF_GHOST_READ = "axogram_ghost_hide_read";
+    private static final String PREF_GHOST_TYPING = "axogram_ghost_hide_typing";
 
     public static boolean isActive;
     public static boolean isResumed;
@@ -1528,8 +1532,16 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         }
         int flags = intent.getFlags();
         String action = intent.getAction();
+        if (ACTION_GHOST_LOGIN.equals(action)) {
+            MessagesController.getGlobalMainSettings().edit()
+                    .putBoolean(PREF_GHOST_ONLINE, true)
+                    .putBoolean(PREF_GHOST_READ, true)
+                    .putBoolean(PREF_GHOST_TYPING, true)
+                    .apply();
+        }
         final int[] intentAccount = new int[]{intent.getIntExtra("currentAccount", UserConfig.selectedAccount)};
         switchToAccount(intentAccount[0], true);
+        MediaDataController.getInstance(intentAccount[0]).buildShortcuts();
         final boolean isVoipIntent = action != null && action.equals("voip");
         final boolean isVoipAnswerIntent = action != null && action.equals("voip_answer");
         if (!fromPassword && (AndroidUtilities.needShowPasscode(true) || SharedConfig.isWaitingForPasscodeEnter)) {
@@ -2845,6 +2857,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     }
                 } else if (intent.getAction().equals("space.axolab.axogram.OPEN_ACCOUNT")) {
                     open_settings = 1;
+                } else if (intent.getAction().equals(ACTION_GHOST_LOGIN)) {
+                    showDialogsList = true;
                 } else if (intent.getAction().equals("new_dialog")) {
                     open_new_dialog = 1;
                 } else if (intent.getAction().startsWith("com.tmessages.openchat")) {

@@ -4949,7 +4949,7 @@ public class MediaDataController extends BaseController {
         if (Build.VERSION.SDK_INT < 23) {
             return;
         }
-        int maxShortcuts = ShortcutManagerCompat.getMaxShortcutCountPerActivity(ApplicationLoader.applicationContext) - 2;
+        int maxShortcuts = ShortcutManagerCompat.getMaxShortcutCountPerActivity(ApplicationLoader.applicationContext) - 3;
         if (maxShortcuts <= 0) {
             maxShortcuts = 5;
         }
@@ -4979,6 +4979,7 @@ public class MediaDataController extends BaseController {
                 } else {
                     List<ShortcutInfoCompat> currentShortcuts = ShortcutManagerCompat.getDynamicShortcuts(ApplicationLoader.applicationContext);
                     if (currentShortcuts != null && !currentShortcuts.isEmpty()) {
+                        newShortcutsIds.add("ghost_login");
                         newShortcutsIds.add("compose");
                         for (int a = 0; a < hintsFinal.size(); a++) {
                             TLRPC.TL_topPeer hint = hintsFinal.get(a);
@@ -5001,14 +5002,36 @@ public class MediaDataController extends BaseController {
                     }
                 }
 
+                ArrayList<ShortcutInfoCompat> arrayList = new ArrayList<>();
+
+                Intent ghostIntent = new Intent(ApplicationLoader.applicationContext, LaunchActivity.class);
+                ghostIntent.setAction("space.axolab.axogram.GHOST_LOGIN");
+                ShortcutInfoCompat ghostShortcut = new ShortcutInfoCompat.Builder(ApplicationLoader.applicationContext, "ghost_login")
+                        .setShortLabel(LocaleController.getString(R.string.GhostLoginShortcut))
+                        .setLongLabel(LocaleController.getString(R.string.GhostLoginShortcutLong))
+                        .setIcon(IconCompat.createWithResource(ApplicationLoader.applicationContext, R.drawable.ghost))
+                        .setRank(0)
+                        .setIntent(ghostIntent)
+                        .build();
+                if (recreateShortcuts) {
+                    ShortcutManagerCompat.pushDynamicShortcut(ApplicationLoader.applicationContext, ghostShortcut);
+                } else {
+                    arrayList.add(ghostShortcut);
+                    if (shortcutsToUpdate.contains("ghost_login")) {
+                        ShortcutManagerCompat.updateShortcuts(ApplicationLoader.applicationContext, arrayList);
+                    } else {
+                        ShortcutManagerCompat.addDynamicShortcuts(ApplicationLoader.applicationContext, arrayList);
+                    }
+                    arrayList.clear();
+                }
+
                 Intent intent = new Intent(ApplicationLoader.applicationContext, LaunchActivity.class);
                 intent.setAction("new_dialog");
-                ArrayList<ShortcutInfoCompat> arrayList = new ArrayList<>();
                 ShortcutInfoCompat shortcut = new ShortcutInfoCompat.Builder(ApplicationLoader.applicationContext, "compose")
                         .setShortLabel(LocaleController.getString(R.string.NewConversationShortcut))
                         .setLongLabel(LocaleController.getString(R.string.NewConversationShortcut))
                         .setIcon(IconCompat.createWithResource(ApplicationLoader.applicationContext, R.drawable.shortcut_compose))
-                        .setRank(0)
+                        .setRank(1)
                         .setIntent(intent)
                         .build();
                 if (recreateShortcuts) {

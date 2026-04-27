@@ -35,6 +35,9 @@ public class AxoGramSectionFragment extends BaseFragment {
     public static final int TYPE_FEATURES = 3;
 
     private static final String PREF_COLLAPSE_SETTINGS_TABS = "axogram_collapse_settings_tabs";
+    private static final String PREF_GHOST_ONLINE = "axogram_ghost_hide_online";
+    private static final String PREF_GHOST_READ = "axogram_ghost_hide_read";
+    private static final String PREF_GHOST_TYPING = "axogram_ghost_hide_typing";
 
     private final int type;
 
@@ -202,6 +205,8 @@ public class AxoGramSectionFragment extends BaseFragment {
 
         if (type == TYPE_CUSTOMIZATION) {
             addCustomizationContent(context, contentView, isDarkTheme);
+        } else if (type == TYPE_GHOST) {
+            addGhostContent(context, contentView, isDarkTheme);
         } else {
             addPlaceholderContent(context, contentView);
         }
@@ -326,6 +331,129 @@ public class AxoGramSectionFragment extends BaseFragment {
             updateOptionAppearance.run();
         });
         updateOptionAppearance.run();
+    }
+
+    private void addGhostContent(Context context, FrameLayout contentView, boolean isDarkTheme) {
+        TextView sectionHeaderView = new TextView(context);
+        sectionHeaderView.setText("Функции");
+        sectionHeaderView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        sectionHeaderView.setTextSize(14);
+        sectionHeaderView.setTypeface(AndroidUtilities.bold());
+        FrameLayout.LayoutParams headerLayoutParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        headerLayoutParams.gravity = Gravity.TOP | Gravity.LEFT;
+        headerLayoutParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(154);
+        headerLayoutParams.leftMargin = AndroidUtilities.dp(28);
+        contentView.addView(sectionHeaderView, headerLayoutParams);
+
+        LinearLayout ghostLayout = new LinearLayout(context);
+        ghostLayout.setOrientation(LinearLayout.VERTICAL);
+        FrameLayout.LayoutParams ghostLayoutParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        ghostLayoutParams.gravity = Gravity.TOP;
+        ghostLayoutParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(180);
+        ghostLayoutParams.leftMargin = AndroidUtilities.dp(16);
+        ghostLayoutParams.rightMargin = AndroidUtilities.dp(16);
+        contentView.addView(ghostLayout, ghostLayoutParams);
+
+        final boolean[] currentStates = new boolean[] {
+                MessagesController.getGlobalMainSettings().getBoolean(PREF_GHOST_ONLINE, false),
+                MessagesController.getGlobalMainSettings().getBoolean(PREF_GHOST_READ, false),
+                MessagesController.getGlobalMainSettings().getBoolean(PREF_GHOST_TYPING, false)
+        };
+
+        NotificationsCheckCell masterCell = createGhostToggleCell(
+                context,
+                "Включить",
+                "Включает сразу все функции режима призрака. Если всё уже активно, выключает всё одним нажатием."
+        );
+        NotificationsCheckCell onlineCell = createGhostToggleCell(
+                context,
+                "Скрытие статуса в сети",
+                "Аккуратно скрывает статус сети. Даже если ты в Telegram, у других будет показано, что ты не в сети."
+        );
+        NotificationsCheckCell readCell = createGhostToggleCell(
+                context,
+                "Скрытие прочтения",
+                "Если ты откроешь чат и прочитаешь сообщение, у собеседника это не будет показано."
+        );
+        NotificationsCheckCell typingCell = createGhostToggleCell(
+                context,
+                "Скрытие статуса печати",
+                "Не будет показываться, что ты печатаешь, записываешь голосовое, видео или отправляешь файл."
+        );
+
+        NotificationsCheckCell[] managedCells = new NotificationsCheckCell[] {onlineCell, readCell, typingCell};
+        String[] managedPrefs = new String[] {PREF_GHOST_ONLINE, PREF_GHOST_READ, PREF_GHOST_TYPING};
+
+        Runnable updateGhostCells = () -> {
+            currentStates[0] = MessagesController.getGlobalMainSettings().getBoolean(PREF_GHOST_ONLINE, false);
+            currentStates[1] = MessagesController.getGlobalMainSettings().getBoolean(PREF_GHOST_READ, false);
+            currentStates[2] = MessagesController.getGlobalMainSettings().getBoolean(PREF_GHOST_TYPING, false);
+
+            onlineCell.setChecked(currentStates[0]);
+            readCell.setChecked(currentStates[1]);
+            typingCell.setChecked(currentStates[2]);
+
+            boolean allEnabled = currentStates[0] && currentStates[1] && currentStates[2];
+            masterCell.setChecked(allEnabled);
+        };
+
+        masterCell.setOnClickListener(v -> {
+            boolean allEnabled = MessagesController.getGlobalMainSettings().getBoolean(PREF_GHOST_ONLINE, false)
+                    && MessagesController.getGlobalMainSettings().getBoolean(PREF_GHOST_READ, false)
+                    && MessagesController.getGlobalMainSettings().getBoolean(PREF_GHOST_TYPING, false);
+            boolean target = !allEnabled;
+            MessagesController.getGlobalMainSettings().edit()
+                    .putBoolean(PREF_GHOST_ONLINE, target)
+                    .putBoolean(PREF_GHOST_READ, target)
+                    .putBoolean(PREF_GHOST_TYPING, target)
+                    .apply();
+            updateGhostCells.run();
+        });
+
+        for (int i = 0; i < managedCells.length; i++) {
+            final int index = i;
+            managedCells[i].setOnClickListener(v -> {
+                boolean enabled = !MessagesController.getGlobalMainSettings().getBoolean(managedPrefs[index], false);
+                MessagesController.getGlobalMainSettings().edit().putBoolean(managedPrefs[index], enabled).apply();
+                updateGhostCells.run();
+            });
+        }
+
+        ghostLayout.addView(createGhostCard(context, masterCell, isDarkTheme));
+        ghostLayout.addView(createGhostCard(context, onlineCell, isDarkTheme));
+        ghostLayout.addView(createGhostCard(context, readCell, isDarkTheme));
+        ghostLayout.addView(createGhostCard(context, typingCell, isDarkTheme));
+        updateGhostCells.run();
+    }
+
+    private NotificationsCheckCell createGhostToggleCell(Context context, String title, String subtitle) {
+        NotificationsCheckCell cell = new NotificationsCheckCell(context, 21, 92, false, resourceProvider);
+        cell.setDrawLine(false);
+        cell.setBackgroundColor(0);
+        cell.setTextAndValueAndCheck(title, subtitle, false, 0, false, false);
+        return cell;
+    }
+
+    private View createGhostCard(Context context, View cell, boolean isDarkTheme) {
+        FrameLayout optionCard = new FrameLayout(context);
+        GradientDrawable optionCardBackground = new GradientDrawable();
+        optionCardBackground.setShape(GradientDrawable.RECTANGLE);
+        optionCardBackground.setCornerRadius(AndroidUtilities.dp(20));
+        optionCardBackground.setColor(ColorUtils.blendARGB(
+                Theme.getColor(Theme.key_windowBackgroundWhite),
+                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText),
+                isDarkTheme ? 0.10f : 0.04f
+        ));
+        optionCardBackground.setStroke(AndroidUtilities.dp(1), ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 38 : 22));
+        optionCard.setBackground(optionCardBackground);
+        LinearLayout.LayoutParams optionCardParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        optionCardParams.bottomMargin = AndroidUtilities.dp(10);
+        optionCard.setLayoutParams(optionCardParams);
+        optionCard.addView(cell, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
+        return optionCard;
     }
 
     private void addPlaceholderContent(Context context, FrameLayout contentView) {

@@ -157,6 +157,8 @@
     <string name="PaymentAppNotFoundForDeeplink">No app found to handle this deep link.</string>
     <!--chats view-->
     <string name="NewConversationShortcut">New conversation</string>
+    <string name="GhostLoginShortcut">Enter with Ghost</string>
+    <string name="GhostLoginShortcutLong">Open AxoGram in Ghost Mode</string>
     <string name="AutoNightSystemModeOff">System Default theme is disabled</string>
     <string name="AutoNightModeOff">Auto-Night Mode is off</string>
     <string name="SetEmojiStatus">Set Emoji Status</string>

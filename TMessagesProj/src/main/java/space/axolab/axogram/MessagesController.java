@@ -133,6 +133,10 @@ import java.util.stream.Collectors;
 
 public class MessagesController extends BaseController implements NotificationCenter.NotificationCenterDelegate {
 
+    private static final String PREF_GHOST_ONLINE = "axogram_ghost_hide_online";
+    private static final String PREF_GHOST_READ = "axogram_ghost_hide_read";
+    private static final String PREF_GHOST_TYPING = "axogram_ghost_hide_typing";
+
     public int lastKnownSessionsCount;
     private final ConcurrentHashMap<Long, TLRPC.Chat> chats = new ConcurrentHashMap<>(100, 1.0f, 2);
     private final ConcurrentHashMap<Integer, TLRPC.EncryptedChat> encryptedChats = new ConcurrentHashMap<>(10, 1.0f, 2);
@@ -1490,6 +1494,18 @@ public class MessagesController extends BaseController implements NotificationCe
 
     public static SharedPreferences getGlobalMainSettings() {
         return getInstance(0).mainPreferences;
+    }
+
+    private boolean isGhostHideOnlineEnabled() {
+        return getGlobalMainSettings().getBoolean(PREF_GHOST_ONLINE, false);
+    }
+
+    private boolean isGhostHideReadEnabled() {
+        return getGlobalMainSettings().getBoolean(PREF_GHOST_READ, false);
+    }
+
+    private boolean isGhostHideTypingEnabled() {
+        return getGlobalMainSettings().getBoolean(PREF_GHOST_TYPING, false);
     }
 
     public static SharedPreferences getEmojiSettings(int account) {
@@ -10147,7 +10163,28 @@ public class MessagesController extends BaseController implements NotificationCe
         checkReadTasks();
 
         if (getUserConfig().isClientActivated()) {
-            if (!ignoreSetOnline && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
+            if (!ignoreSetOnline && isGhostHideOnlineEnabled() && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
+                if (statusSettingState != 2 && (lastStatusUpdateTime == 0 || Math.abs(System.currentTimeMillis() - lastStatusUpdateTime) >= 1500 || !offlineSent)) {
+                    statusSettingState = 2;
+                    if (statusRequest != 0) {
+                        getConnectionsManager().cancelRequest(statusRequest, true);
+                    }
+                    TL_account.updateStatus req = new TL_account.updateStatus();
+                    req.offline = true;
+                    statusRequest = getConnectionsManager().sendRequest(req, (response, error) -> {
+                        if (error == null) {
+                            lastStatusUpdateTime = System.currentTimeMillis();
+                            offlineSent = true;
+                            statusSettingState = 0;
+                        } else {
+                            if (lastStatusUpdateTime != 0) {
+                                lastStatusUpdateTime += 1500;
+                            }
+                        }
+                        statusRequest = 0;
+                    });
+                }
+            } else if (!ignoreSetOnline && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
                 if (ApplicationLoader.mainInterfacePausedStageQueueTime != 0 && Math.abs(ApplicationLoader.mainInterfacePausedStageQueueTime - System.currentTimeMillis()) > 1000) {
                     if (statusSettingState != 1 && (lastStatusUpdateTime == 0 || Math.abs(System.currentTimeMillis() - lastStatusUpdateTime) >= 55000 || offlineSent)) {
                         statusSettingState = 1;
@@ -11006,6 +11043,9 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean sendTyping(long dialogId, long threadMsgId, int action, String emojicon, int classGuid) {
+        if (isGhostHideTypingEnabled()) {
+            return false;
+        }
         if (action < 0 || action >= sendingTypings.length || dialogId == 0) {
             return false;
         }
@@ -13933,6 +13973,9 @@ public class MessagesController extends BaseController implements NotificationCe
         long dialogId = messageObject.getDialogId();
         getMessagesStorage().markMessagesContentAsRead(dialogId, arrayList, 0, 0);
         getNotificationCenter().postNotificationName(NotificationCenter.messagesReadContent, dialogId, arrayList);
+        if (isGhostHideReadEnabled()) {
+            return;
+        }
         if (messageObject.getId() < 0) {
             markMessageAsRead(messageObject.getDialogId(), messageObject.messageOwner.random_id, Integer.MIN_VALUE);
         } else {
@@ -13961,6 +14004,9 @@ public class MessagesController extends BaseController implements NotificationCe
 
     public void markMentionMessageAsRead(int mid, long channelId, long did) {
         getMessagesStorage().markMentionMessageAsRead(-channelId, mid, did);
+        if (isGhostHideReadEnabled()) {
+            return;
+        }
         if (channelId != 0) {
             TLRPC.TL_channels_readMessageContents req = new TLRPC.TL_channels_readMessageContents();
             req.channel = getInputChannel(channelId);
@@ -14068,6 +14114,9 @@ public class MessagesController extends BaseController implements NotificationCe
         if (randomId == 0 || dialogId == 0 || ttl <= 0 && ttl != Integer.MIN_VALUE) {
             return;
         }
+        if (isGhostHideReadEnabled()) {
+            return;
+        }
         if (!DialogObject.isEncryptedDialog(dialogId)) {
             return;
         }
@@ -14085,6 +14134,9 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     private void completeReadTask(ReadTask task) {
+        if (isGhostHideReadEnabled()) {
+            return;
+        }
         if (task.replyId != 0 && task.monoForumPeerId == 0) {
             TLRPC.TL_messages_readDiscussion req = new TLRPC.TL_messages_readDiscussion();
             req.msg_id = (int) task.replyId;
@@ -14191,6 +14243,9 @@ public class MessagesController extends BaseController implements NotificationCe
             return;
         }
         getMessagesStorage().resetMentionsCount(dialogId, topicId, 0);
+        if (isGhostHideReadEnabled()) {
+            return;
+        }
         TLRPC.TL_messages_readMentions req = new TLRPC.TL_messages_readMentions();
         req.peer = getInputPeer(dialogId);
         if (topicId != 0) {

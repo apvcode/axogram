@@ -26,6 +26,8 @@
     <string name="SyncContactsInfoOff">Включите, чтобы добавлять контакты с этого устройства к Вашему аккаунту.</string>
     <string name="SyncContactsAdded">Контакты с этого устройства были добавлены к Вашему аккаунту.</string>
     <string name="ContactsPermissionAlertDontAsk">Больше не спрашивать</string>
+    <string name="GhostLoginShortcut">Войти с призраком</string>
+    <string name="GhostLoginShortcutLong">Открыть AxoGram в режиме призрака</string>
     <string name="ConfirmCorrectNumber">Правильно ли указан номер?</string>
     <string name="WrongNumberFormat">Некорректный формат</string>
     <string name="ShortNumberInfo">Указанный номер слишком короткий для региона **%1$s**:\n\n**%2$s**\n\nУбедитесь, что правильно указываете номер. Он должен начинаться с кода страны.</string>
