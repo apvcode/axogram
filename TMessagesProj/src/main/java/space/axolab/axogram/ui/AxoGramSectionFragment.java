@@ -384,11 +384,17 @@ public class AxoGramSectionFragment extends BaseFragment {
         GradientDrawable previewStageBackground = new GradientDrawable();
         previewStageBackground.setShape(GradientDrawable.RECTANGLE);
         previewStageBackground.setCornerRadius(AndroidUtilities.dp(18));
-        previewStageBackground.setColor(ColorUtils.blendARGB(
-                Theme.getColor(Theme.key_windowBackgroundWhiteBlackText),
-                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText),
-                isDarkTheme ? 0.16f : 0.09f
-        ));
+        previewStageBackground.setColor(isDarkTheme
+                ? ColorUtils.blendARGB(
+                        Theme.getColor(Theme.key_windowBackgroundWhite),
+                        Theme.getColor(Theme.key_dialogBackground),
+                        0.38f
+                )
+                : ColorUtils.blendARGB(
+                        Theme.getColor(Theme.key_windowBackgroundWhiteBlackText),
+                        Theme.getColor(Theme.key_windowBackgroundWhiteBlueText),
+                        0.09f
+                ));
         previewStage.setBackground(previewStageBackground);
         FrameLayout.LayoutParams previewStageParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(154));
         previewStageParams.gravity = Gravity.TOP;
@@ -400,12 +406,24 @@ public class AxoGramSectionFragment extends BaseFragment {
         FrameLayout dialogPreview = new FrameLayout(context);
         GradientDrawable dialogPreviewBackground = new GradientDrawable();
         dialogPreviewBackground.setShape(GradientDrawable.RECTANGLE);
-        dialogPreviewBackground.setColor(ColorUtils.blendARGB(
-                Theme.getColor(Theme.key_dialogBackground),
-                Theme.getColor(Theme.key_windowBackgroundWhite),
-                isDarkTheme ? 0.14f : 0.08f
-        ));
-        dialogPreviewBackground.setStroke(AndroidUtilities.dp(1), ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhite), isDarkTheme ? 38 : 24));
+        dialogPreviewBackground.setColor(isDarkTheme
+                ? ColorUtils.blendARGB(
+                        Theme.getColor(Theme.key_dialogBackground),
+                        Theme.getColor(Theme.key_windowBackgroundWhite),
+                        0.03f
+                )
+                : ColorUtils.blendARGB(
+                        Theme.getColor(Theme.key_dialogBackground),
+                        Theme.getColor(Theme.key_windowBackgroundWhite),
+                        0.08f
+                ));
+        dialogPreviewBackground.setStroke(
+                AndroidUtilities.dp(1),
+                ColorUtils.setAlphaComponent(
+                        isDarkTheme ? Theme.getColor(Theme.key_windowBackgroundWhiteBlueText) : Theme.getColor(Theme.key_windowBackgroundWhite),
+                        isDarkTheme ? 22 : 24
+                )
+        );
         FrameLayout.LayoutParams dialogPreviewParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(126));
         dialogPreviewParams.gravity = Gravity.TOP;
         dialogPreviewParams.topMargin = AndroidUtilities.dp(52);

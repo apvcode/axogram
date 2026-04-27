@@ -520,7 +520,7 @@ public class AxoGramEmptyFragment extends BaseFragment {
 
         ImageView iconView = new ImageView(context);
         iconView.setImageResource(iconRes);
-        iconView.setColorFilter(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhite), 150));
+        iconView.setColorFilter(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), 210));
         iconView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         FrameLayout.LayoutParams iconFrameLayoutParams = new FrameLayout.LayoutParams(AndroidUtilities.dp(26), AndroidUtilities.dp(26), Gravity.CENTER);
         iconHolder.addView(iconView, iconFrameLayoutParams);
