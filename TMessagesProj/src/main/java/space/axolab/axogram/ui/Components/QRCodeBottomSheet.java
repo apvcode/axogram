@@ -3,7 +3,6 @@ package space.axolab.axogram.ui.Components;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
-import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -15,7 +14,6 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
-import android.net.Uri;
 import android.os.Build;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -123,21 +121,8 @@ public class QRCodeBottomSheet extends BottomSheet {
         buttonTextView.setGravity(Gravity.CENTER);
         buttonTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         buttonTextView.setTypeface(AndroidUtilities.bold());
-        buttonTextView.setText(LocaleController.getString(R.string.ShareQrCode));
-        buttonTextView.setOnClickListener(view -> {
-            Uri uri = AndroidUtilities.getBitmapShareUri(qrCode, "qr_tmp.png", Bitmap.CompressFormat.PNG);
-            if (uri != null) {
-                Intent i = new Intent(Intent.ACTION_SEND);
-
-                i.setType("image/*");
-                i.putExtra(Intent.EXTRA_STREAM, uri);
-                try {
-                    AndroidUtilities.findActivity(context).startActivityForResult(Intent.createChooser(i, getTitleView().getText()), 500);
-                } catch (ActivityNotFoundException ex) {
-                    ex.printStackTrace();
-                }
-            }
-        });
+        buttonTextView.setText(LocaleController.getString(R.string.Close));
+        buttonTextView.setOnClickListener(view -> dismiss());
         linearLayout.addView(buttonTextView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, Gravity.BOTTOM, 16, 15, 16, 3));
 
         if (includeShareLink) {
