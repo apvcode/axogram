@@ -126,6 +126,7 @@ import androidx.viewpager.widget.ViewPager;
 import space.axolab.axogram.PhoneFormat.PhoneFormat;
 import space.axolab.axogram.AccountInstance;
 import space.axolab.axogram.AndroidUtilities;
+import space.axolab.axogram.AxoGramVerifiedChannels;
 import space.axolab.axogram.ApplicationLoader;
 import space.axolab.axogram.AuthTokensHelper;
 import space.axolab.axogram.BillingController;
@@ -11601,7 +11602,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     if (chat.scam || chat.fake) {
                         nameTextView[a].setRightDrawable2(getScamDrawable(chat.scam ? 0 : 1));
                         nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.ScamMessage);
-                    } else if (chat.verified) {
+                    } else if (AxoGramVerifiedChannels.isVerifiedChat(chat)) {
                         nameTextView[a].setRightDrawable2(getVerifiedCrossfadeDrawable(a));
                         nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrVerified);
                     } else {
@@ -11630,7 +11631,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 } else if (!copyFromChatActivity) {
                     if (chat.scam || chat.fake) {
                         nameTextView[a].setRightDrawable2(getScamDrawable(chat.scam ? 0 : 1));
-                    } else if (chat.verified) {
+                    } else if (AxoGramVerifiedChannels.isVerifiedChat(chat)) {
                         nameTextView[a].setRightDrawable2(getVerifiedCrossfadeDrawable(a));
                     } else if (getMessagesController().isDialogMuted(-chatId, topicId)) {
                         nameTextView[a].setRightDrawable2(getThemedDrawable(Theme.key_drawable_muteIconDrawable));

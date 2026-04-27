@@ -3,6 +3,7 @@ package space.axolab.axogram.ui.Components;
 import android.graphics.drawable.Drawable;
 import android.view.View;
 
+import space.axolab.axogram.AxoGramVerifiedChannels;
 import space.axolab.axogram.AndroidUtilities;
 import space.axolab.axogram.DialogObject;
 import space.axolab.axogram.tgnet.TLObject;
@@ -33,7 +34,7 @@ public class StatusBadgeComponent {
     }
 
     public Drawable updateDrawable(TLRPC.User user, TLRPC.Chat chat, int colorFilter, boolean animated) {
-        if (chat != null && chat.verified) {
+        if (chat != null && AxoGramVerifiedChannels.isVerifiedChat(chat)) {
             statusDrawable.set(verifiedDrawable = (verifiedDrawable == null ? new CombinedDrawable(Theme.dialogs_verifiedDrawable, Theme.dialogs_verifiedCheckDrawable) : verifiedDrawable), animated);
             statusDrawable.setColor(null);
         } else if (chat != null && DialogObject.getEmojiStatusDocumentId(chat.emoji_status) != 0) {

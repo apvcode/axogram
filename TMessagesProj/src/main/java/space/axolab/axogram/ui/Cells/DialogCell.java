@@ -61,6 +61,7 @@ import androidx.core.math.MathUtils;
 
 import space.axolab.axogram.AndroidUtilities;
 import space.axolab.axogram.ApplicationLoader;
+import space.axolab.axogram.AxoGramVerifiedChannels;
 import space.axolab.axogram.ChatObject;
 import space.axolab.axogram.ChatThemeController;
 import space.axolab.axogram.CodeHighlighting;
@@ -1417,7 +1418,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                             emojiStatus.set(DialogObject.getEmojiStatusDocumentId(chat.emoji_status), false);
                             emojiStatus.setParticles(DialogObject.isEmojiStatusCollectible(chat.emoji_status), false);
                         } else {
-                            drawVerified = !forbidVerified && chat.verified;
+                            drawVerified = !forbidVerified && AxoGramVerifiedChannels.isVerifiedChat(chat);
                             drawBotVerified = !forbidVerified && chat.bot_verification_icon != 0;
                         }
                     } else if (user != null) {

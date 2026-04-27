@@ -33,6 +33,7 @@ import androidx.annotation.NonNull;
 
 import space.axolab.axogram.PhoneFormat.PhoneFormat;
 import space.axolab.axogram.AndroidUtilities;
+import space.axolab.axogram.AxoGramVerifiedChannels;
 import space.axolab.axogram.ChatObject;
 import space.axolab.axogram.ContactsController;
 import space.axolab.axogram.DialogObject;
@@ -434,11 +435,11 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
             updateStatus(false, null, null, false);
         } else if (chat != null) {
             dialog_id = -chat.id;
-            drawCheck = chat.verified;
+            drawCheck = AxoGramVerifiedChannels.isVerifiedChat(chat);
             if (chat.monoforum) {
                 TLRPC.Chat mfChat = MessagesController.getInstance(currentAccount).getChat(chat.linked_monoforum_id);
                 if (mfChat != null) {
-                    drawCheck = mfChat.verified;
+                    drawCheck = AxoGramVerifiedChannels.isVerifiedChat(mfChat);
                 }
             }
             if (!LocaleController.isRTL) {
@@ -873,7 +874,7 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
                 }
             }
             if (!continueUpdate && (mask & MessagesController.UPDATE_MASK_EMOJI_STATUS) != 0 && (user != null || chat != null)) {
-                updateStatus(user != null ? user.verified : chat.verified, user, chat, true);
+                updateStatus(user != null ? user.verified : AxoGramVerifiedChannels.isVerifiedChat(chat), user, chat, true);
             }
             if (!continueUpdate && ((mask & MessagesController.UPDATE_MASK_NAME) != 0 && user != null) || (mask & MessagesController.UPDATE_MASK_CHAT_NAME) != 0 && chat != null) {
                 String newName;
