@@ -20,7 +20,9 @@
 **AxoGram** — это форк официального клиента Telegram для Android. Цель проекта — расширение стандартного функционала и улучшение пользовательского опыта.
 
 > [!IMPORTANT]
-> Данный репозиторий содержит исходный код. Если вы ищете готовые сборки, загляните в раздел **Releases** или наш Telegram-канал.
+> Данный репозиторий содержит исходный код. Если вы ищете готовые сборки, загляните в раздел **Releases** или наш Telegram-канал. <a href="https://github.com/apvcode/axogram/releases/latest">
+<img src="https://img.shields.io/github/v/release/apvcode/axogram?style=flat-square&label=Download&color=2196F3"/>
+</a>
 
 ---
 
