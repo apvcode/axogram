@@ -18723,13 +18723,22 @@ public class MessagesController extends BaseController implements NotificationCe
                     }
                 }
 
-                MessageObject.getDialogId(message);
+                long spyDialogId = MessageObject.getDialogId(message);
+
+                if (MessagesController.getGlobalMainSettings().getBoolean("axogram_spy_save_edits", false)) {
+                    SpyStorage.getInstance(currentAccount).savePreviousMessageVersion(
+                            spyDialogId,
+                            message.id,
+                            message.edit_date,
+                            MessagesController.getGlobalMainSettings().getBoolean("axogram_spy_save_bots", false)
+                    );
+                }
 
                 ConcurrentHashMap<Long, Integer> read_max = message.out ? dialogs_read_outbox_max : dialogs_read_inbox_max;
-                Integer value = read_max.get(message.dialog_id);
+                Integer value = read_max.get(spyDialogId);
                 if (value == null) {
-                    value = getMessagesStorage().getDialogReadMax(message.out, message.dialog_id);
-                    read_max.put(message.dialog_id, value);
+                    value = getMessagesStorage().getDialogReadMax(message.out, spyDialogId);
+                    read_max.put(spyDialogId, value);
                 }
                 message.unread = value < message.id;
                 if (message.dialog_id == clientUserId) {

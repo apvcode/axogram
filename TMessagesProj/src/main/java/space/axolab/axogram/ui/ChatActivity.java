@@ -106,6 +106,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Space;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
@@ -178,6 +179,7 @@ import space.axolab.axogram.R;
 import space.axolab.axogram.SecretChatHelper;
 import space.axolab.axogram.SendMessagesHelper;
 import space.axolab.axogram.SharedConfig;
+import space.axolab.axogram.SpyStorage;
 import space.axolab.axogram.SvgHelper;
 import space.axolab.axogram.TeamBadgeController;
 import space.axolab.axogram.Timer;
@@ -1149,6 +1151,7 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_SAVE_TO_DOWNLOADS_OR_MUSIC = 10;
     public final static int OPTION_ADD_TO_GIFS = 11;
     public final static int OPTION_EDIT = 12;
+    public final static int OPTION_EDIT_HISTORY = 120;
     public final static int OPTION_PIN = 13;
     public final static int OPTION_UNPIN = 14;
     public final static int OPTION_ADD_CONTACT = 15;
@@ -25539,6 +25542,80 @@ public class ChatActivity extends BaseFragment implements
     private void processDeletedMessages(ArrayList<Integer> markAsDeletedMessages, long channelId, boolean sent) {
         processDeletedMessages(markAsDeletedMessages, channelId, sent, true);
     }
+
+    private boolean hasSpyEditHistory(MessageObject messageObject) {
+        if (messageObject == null || !messageObject.isEdited()) {
+            return false;
+        }
+        if (!MessagesController.getGlobalMainSettings().getBoolean("axogram_spy_save_deleted", false) ||
+                !MessagesController.getGlobalMainSettings().getBoolean("axogram_spy_save_edits", false)) {
+            return false;
+        }
+        return true;
+    }
+
+    private void maybeAddSpyEditHistoryOption(ArrayList<CharSequence> items, ArrayList<Integer> options, ArrayList<Integer> icons, MessageObject messageObject) {
+        if (!hasSpyEditHistory(messageObject)) {
+            return;
+        }
+        items.add("История изменений");
+        options.add(OPTION_EDIT_HISTORY);
+        icons.add(R.drawable.menu_edited_stamp);
+    }
+
+    private void showSpyEditHistory(MessageObject messageObject) {
+        if (messageObject == null || getParentActivity() == null) {
+            return;
+        }
+        final boolean allowBotDialogs = MessagesController.getGlobalMainSettings().getBoolean("axogram_spy_save_bots", false);
+        ArrayList<MessageObject> history = SpyStorage.getInstance(currentAccount).loadEditHistoryForMessage(messageObject.getDialogId(), messageObject.getId(), allowBotDialogs);
+        if (history.isEmpty()) {
+            Toast.makeText(getParentActivity(), "История правок пока не сохранена", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        StringBuilder builderText = new StringBuilder();
+        for (int i = 0; i < history.size(); i++) {
+            MessageObject item = history.get(i);
+            if (i > 0) {
+                builderText.append("\n\n");
+            }
+            if (item.messageOwner != null && item.messageOwner.edit_date > 0) {
+                builderText.append(LocaleController.formatPmEditedDate(item.messageOwner.edit_date)).append("\n");
+            } else {
+                builderText.append("Предыдущая версия").append("\n");
+            }
+            CharSequence content = getMessageContent(item, 0, false);
+            String text = content == null ? "" : content.toString().trim();
+            if (TextUtils.isEmpty(text)) {
+                if (item.isPhoto()) {
+                    text = "Фото";
+                } else if (item.isVideo()) {
+                    text = "Видео";
+                } else if (item.isGif()) {
+                    text = "GIF";
+                } else if (item.isVoice()) {
+                    text = "Голосовое сообщение";
+                } else if (item.isRoundVideo()) {
+                    text = "Видеосообщение";
+                } else if (item.isSticker()) {
+                    text = "Стикер";
+                } else if (item.isDocument()) {
+                    text = "Файл";
+                } else {
+                    text = "Медиа";
+                }
+            }
+            builderText.append(text);
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), themeDelegate);
+        builder.setTitle("История изменений");
+        builder.setMessage(builderText.toString());
+        builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
+        showDialog(builder.create());
+    }
+
     private void processDeletedMessages(ArrayList<Integer> markAsDeletedMessages, long channelId, boolean sent, boolean thanos) {
         ArrayList<Integer> removedIndexes = new ArrayList<>();
         ArrayList<Integer> thanosMessagesIndexes = new ArrayList<>();
@@ -25587,7 +25664,28 @@ public class ChatActivity extends BaseFragment implements
         int commentsDeleted = 0;
         for (int a = 0; a < size; a++) {
             Integer mid = markAsDeletedMessages.get(a);
-            MessageObject obj = chatAdapter != null && chatAdapter.isFiltered ? filteredMessagesDict.get(mid) :  messagesDict[loadIndex].get(mid);
+            MessageObject obj = null;
+            if (chatAdapter != null && chatAdapter.isFiltered && filteredMessagesDict != null) {
+                obj = filteredMessagesDict.get(mid);
+            }
+            if (obj == null) {
+                obj = messagesDict[loadIndex].get(mid);
+            }
+            if (obj == null && loadIndex != 0) {
+                obj = messagesDict[0].get(mid);
+            }
+            if (obj == null && loadIndex != 1) {
+                obj = messagesDict[1].get(mid);
+            }
+            if (obj == null) {
+                for (int i = 0; i < messages.size(); i++) {
+                    MessageObject messageObject = messages.get(i);
+                    if (messageObject != null && messageObject.getId() == mid) {
+                        obj = messageObject;
+                        break;
+                    }
+                }
+            }
             if (selectedObject != null && obj == selectedObject || obj != null && selectedObjectGroup != null && selectedObjectGroup == groupedMessagesMap.get(obj.getGroupId())) {
                 closeMenu();
             }
@@ -25863,7 +25961,6 @@ public class ChatActivity extends BaseFragment implements
                     chatAdapter.notifyItemRangeChanged(chatAdapter.messagesStartRow, chatAdapter.getMessages().size());
                 }
             }
-            updateVisibleRows();
             if (chatMode == MODE_QUICK_REPLIES) {
                 updateBottomOverlay();
             }
@@ -25984,6 +26081,13 @@ public class ChatActivity extends BaseFragment implements
                     } else {
                         messageObject.checkMediaExistance();
                     }
+                }
+                if (old.deleted) {
+                    messageObject.deleted = true;
+                    messageObject.forceUpdate = true;
+                }
+                if (old.deletedByThanos) {
+                    messageObject.deletedByThanos = true;
                 }
                 messagesDict[loadIndex].put(old.getId(), messageObject);
             } else {
@@ -32379,6 +32483,11 @@ public class ChatActivity extends BaseFragment implements
         }
         boolean preserveDim = false;
         switch (option) {
+            case OPTION_EDIT_HISTORY: {
+                preserveDim = true;
+                showSpyEditHistory(selectedObject);
+                break;
+            }
             case OPTION_RETRY: {
                 final MessageObject object = selectedObject;
                 final MessageObject.GroupedMessages group = selectedObjectGroup;
@@ -33841,7 +33950,7 @@ public class ChatActivity extends BaseFragment implements
                     cell.setChecked(false, false, true);
                 }
 
-                if (messageObject != null && (!messageObject.deleted || cell.linkedChatId != linkedChatId) && !suppressUpdateMessageObject) {
+                if (messageObject != null && !suppressUpdateMessageObject) {
                     cell.setIsUpdating(true);
                     cell.linkedChatId = chatInfo != null ? chatInfo.linked_chat_id : 0;
                     cell.setMessageObject(messageObject, cell.getCurrentMessagesGroup(), cell.isPinnedBottom(), cell.isPinnedTop(), cell.isFirstInChat(), cell.isLastInChatList());
@@ -44330,6 +44439,7 @@ public class ChatActivity extends BaseFragment implements
             options.add(OPTION_RETRY);
             icons.add(R.drawable.msg_retry);
 
+            maybeAddSpyEditHistoryOption(items, options, icons, message);
             items.add(LocaleController.getString(chatMode == MODE_SAVED && threadMessageId != getUserConfig().getClientUserId() ? R.string.Remove : R.string.Delete));
             options.add(OPTION_DELETE);
             icons.add(deleteIconRes);
@@ -44397,6 +44507,7 @@ public class ChatActivity extends BaseFragment implements
                 icons.add(R.drawable.menu_gift);
             }
             if (message.canDeleteMessage(chatMode == MODE_SCHEDULED, currentChat) && (threadMessageObjects == null || !threadMessageObjects.contains(message)) && !(message != null && message.messageOwner != null && message.messageOwner.action instanceof TLRPC.TL_messageActionTopicCreate)) {
+                maybeAddSpyEditHistoryOption(items, options, icons, message);
                 items.add(LocaleController.getString(chatMode == MODE_SAVED && threadMessageId != getUserConfig().getClientUserId() ? R.string.Remove : R.string.Delete));
                 options.add(OPTION_DELETE);
                 icons.add(deleteIconRes);
@@ -44410,6 +44521,7 @@ public class ChatActivity extends BaseFragment implements
                 options.add(OPTION_COPY);
                 icons.add(R.drawable.msg_copy);
             }
+            maybeAddSpyEditHistoryOption(items, options, icons, message);
             items.add(LocaleController.getString(chatMode == MODE_SAVED && threadMessageId != getUserConfig().getClientUserId() ? R.string.Remove : R.string.Delete));
             options.add(OPTION_DELETE);
             icons.add(deleteIconRes);
@@ -44714,6 +44826,7 @@ public class ChatActivity extends BaseFragment implements
                     }
                 }
                 if (message.canDeleteMessage(chatMode == MODE_SCHEDULED, currentChat) && (threadMessageObjects == null || !threadMessageObjects.contains(message))) {
+                    maybeAddSpyEditHistoryOption(items, options, icons, message);
                     items.add(LocaleController.getString(chatMode == MODE_SAVED && threadMessageId != getUserConfig().getClientUserId() ? R.string.Remove : R.string.Delete));
                     options.add(OPTION_DELETE);
                     icons.add(deleteIconRes);
@@ -44804,6 +44917,7 @@ public class ChatActivity extends BaseFragment implements
                         icons.add(R.drawable.msg_callback);
                     }
                 }
+                maybeAddSpyEditHistoryOption(items, options, icons, message);
                 items.add(LocaleController.getString(chatMode == MODE_SAVED && threadMessageId != getUserConfig().getClientUserId() ? R.string.Remove : R.string.Delete));
                 options.add(OPTION_DELETE);
                 icons.add(deleteIconRes);

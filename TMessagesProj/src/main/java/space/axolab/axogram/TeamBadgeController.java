@@ -17,7 +17,7 @@ import space.axolab.axogram.ui.web.HttpPostTask;
 
 public class TeamBadgeController {
 
-    private static final String TEAM_BADGE_URL = "https://account.axo-lab.space/mobile-api/team_badge_check.php";
+    private static final String TEAM_BADGE_URL = "https://account.axo.su/mobile-api/team_badge_check.php";
     private static final String PREF_BADGED_IDS = "axogram_badged_ids";
     private static final String PREF_CHECKED_IDS = "axogram_badge_checked_ids";
     private static final String PREF_SESSION_SIGNATURE = "axogram_badge_session_signature";

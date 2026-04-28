@@ -1,27 +1,44 @@
 package space.axolab.axogram.ui;
 
 import android.animation.ValueAnimator;
+import android.app.Activity;
+import android.content.DialogInterface;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
 import android.graphics.Shader;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Build;
+import android.os.PowerManager;
+import android.provider.DocumentsContract;
+import android.provider.Settings;
 import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.core.graphics.ColorUtils;
+import androidx.core.content.FileProvider;
 
+import java.io.File;
 import java.util.Random;
 
+import space.axolab.axogram.AccountInstance;
+import space.axolab.axogram.ApplicationLoader;
 import space.axolab.axogram.AndroidUtilities;
+import space.axolab.axogram.MediaController;
 import space.axolab.axogram.MessagesController;
 import space.axolab.axogram.R;
+import space.axolab.axogram.SendMessagesHelper;
+import space.axolab.axogram.SpyStorage;
 import space.axolab.axogram.ui.ActionBar.ActionBar;
 import space.axolab.axogram.ui.ActionBar.AlertDialog;
 import space.axolab.axogram.ui.ActionBar.BaseFragment;
@@ -41,11 +58,37 @@ public class AxoGramSectionFragment extends BaseFragment {
     private static final String PREF_GHOST_ONLINE = "axogram_ghost_hide_online";
     private static final String PREF_GHOST_READ = "axogram_ghost_hide_read";
     private static final String PREF_GHOST_TYPING = "axogram_ghost_hide_typing";
+    private static final String PREF_SPY_SAVE_DELETED = "axogram_spy_save_deleted";
+    private static final String PREF_SPY_SAVE_EDITS = "axogram_spy_save_edits";
+    private static final String PREF_SPY_SAVE_BOTS = "axogram_spy_save_bots";
+    private static final String PREF_SPY_SAVE_READ_DATE = "axogram_spy_save_read_date";
+    private static final String PREF_SPY_SAVE_LAST_ONLINE = "axogram_spy_save_last_online";
+    private static final String PREF_SPY_SAVE_ATTACHMENTS = "axogram_spy_save_attachments";
+    private static final String PREF_SPY_ATTACHMENTS_FOLDER_URI = "axogram_spy_attachments_folder_uri";
+    private static final String PREF_SPY_ATTACHMENTS_FOLDER_LABEL = "axogram_spy_attachments_folder_label";
+    private static final String PREF_SPY_FOLDER_SIZE_INDEX = "axogram_spy_folder_size_index";
+    private static final String PREF_SPY_ATTACH_PRIVATE_DIALOGS = "axogram_spy_attach_private_dialogs";
+    private static final String PREF_SPY_ATTACH_PUBLIC_CHANNELS = "axogram_spy_attach_public_channels";
+    private static final String PREF_SPY_ATTACH_PRIVATE_CHANNELS = "axogram_spy_attach_private_channels";
+    private static final String PREF_SPY_ATTACH_PUBLIC_CHATS = "axogram_spy_attach_public_chats";
+    private static final String PREF_SPY_ATTACH_PRIVATE_CHATS = "axogram_spy_attach_private_chats";
+    private static final String PREF_SPY_ATTACH_MOBILE_LIMIT_INDEX = "axogram_spy_attach_mobile_limit_index";
+    private static final String PREF_SPY_ATTACH_WIFI_LIMIT_INDEX = "axogram_spy_attach_wifi_limit_index";
     private static final int DEFAULT_DIALOG_CORNER_RADIUS_DP = 36;
     private static final int MIN_DIALOG_CORNER_RADIUS_DP = 12;
     private static final int MAX_DIALOG_CORNER_RADIUS_DP = 36;
+    private static final int REQUEST_SPY_ATTACHMENTS_FOLDER = 4101;
+    private static final int REQUEST_SPY_EXPORT_DATABASE = 4102;
+    private static final int REQUEST_SPY_IMPORT_DATABASE = 4103;
+    private static final String[] SPY_FOLDER_SIZE_LABELS = new String[] {"300 МБ", "1 ГБ", "2 ГБ", "5 ГБ", "16 ГБ", "∞"};
+    private static final String[] SPY_ATTACHMENT_LIMIT_LABELS = new String[] {"до 8,0 МБ", "до 16,0 МБ", "до 32,0 МБ", "до 64,0 МБ", "до 128 МБ", "∞"};
 
     private final int type;
+    private TextView spyFolderValueView;
+    private View spyTopOverlayView;
+    private NotificationsCheckCell spyDeletedMessagesCell;
+    private NotificationsCheckCell spyEditsCell;
+    private boolean waitingForSpyBackgroundPermission;
 
     public AxoGramSectionFragment(int type) {
         this.type = type;
@@ -213,12 +256,37 @@ public class AxoGramSectionFragment extends BaseFragment {
             addCustomizationContent(context, contentView, isDarkTheme);
         } else if (type == TYPE_GHOST) {
             addGhostContent(context, contentView, isDarkTheme);
+        } else if (type == TYPE_SPY) {
+            addSpyContent(context, contentView, titleView, isDarkTheme);
         } else {
             addPlaceholderContent(context, contentView);
         }
 
+        if (spyTopOverlayView != null) {
+            spyTopOverlayView.bringToFront();
+        }
+        titleView.bringToFront();
+        backButtonView.bringToFront();
+
         fragmentView = contentView;
         return fragmentView;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (waitingForSpyBackgroundPermission) {
+            waitingForSpyBackgroundPermission = false;
+            boolean granted = isSpyBackgroundPermissionGranted();
+            MessagesController.getGlobalMainSettings().edit().putBoolean(PREF_SPY_SAVE_DELETED, granted).apply();
+            if (spyDeletedMessagesCell != null) {
+                spyDeletedMessagesCell.setChecked(granted);
+            }
+            updateSpyEditsToggleState();
+            if (getParentActivity() != null && !granted) {
+                Toast.makeText(getParentActivity(), "Фоновая работа не разрешена, сохранение удалённых сообщений отключено", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     private void addCustomizationContent(Context context, FrameLayout contentView, boolean isDarkTheme) {
@@ -665,6 +733,703 @@ public class AxoGramSectionFragment extends BaseFragment {
         optionCard.setLayoutParams(optionCardParams);
         optionCard.addView(cell, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
         return optionCard;
+    }
+
+    private void addSpyContent(Context context, FrameLayout contentView, TextView titleView, boolean isDarkTheme) {
+        final int titleStartTop = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(86);
+        final int titleTargetTop = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(14);
+        final float titleTravel = titleTargetTop - titleStartTop;
+        final float titleMinScale = 0.84f;
+
+        spyTopOverlayView = new View(context);
+        int overlayBaseColor = Theme.getColor(Theme.key_windowBackgroundGray);
+        spyTopOverlayView.setBackgroundColor(ColorUtils.setAlphaComponent(overlayBaseColor, isDarkTheme ? 18 : 24));
+        FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                AndroidUtilities.dp(1)
+        );
+        overlayParams.gravity = Gravity.TOP;
+        contentView.addView(spyTopOverlayView, overlayParams);
+        spyTopOverlayView.setAlpha(isDarkTheme ? 0.28f : 0.22f);
+
+        ScrollView scrollView = new ScrollView(context) {
+            @Override
+            protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+                super.onScrollChanged(l, t, oldl, oldt);
+                float progress = Math.min(1f, t / (float) AndroidUtilities.dp(92));
+                titleView.setTranslationY(titleTravel * progress);
+                float scale = AndroidUtilities.lerp(1f, titleMinScale, progress);
+                titleView.setScaleX(scale);
+                titleView.setScaleY(scale);
+                titleView.setAlpha(AndroidUtilities.lerp(1f, 0.96f, progress));
+            }
+        };
+        scrollView.setVerticalScrollBarEnabled(false);
+        FrameLayout.LayoutParams scrollParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+        scrollParams.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(56);
+        contentView.addView(scrollView, scrollParams);
+
+        LinearLayout container = new LinearLayout(context);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(98), AndroidUtilities.dp(16), AndroidUtilities.dp(28));
+        scrollView.addView(container, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+
+        TextView sectionHeaderView = new TextView(context);
+        sectionHeaderView.setText("Режим шпиона");
+        sectionHeaderView.setTextColor(getSpyAccentColor());
+        sectionHeaderView.setTextSize(14);
+        sectionHeaderView.setTypeface(AndroidUtilities.bold());
+        LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        headerParams.bottomMargin = AndroidUtilities.dp(14);
+        container.addView(sectionHeaderView, headerParams);
+
+        NotificationsCheckCell deletedCell = createSpyToggleCell(context, "Сохранять удалённые сообщения", "Фото, видео, кружки, файлы, одноразовые медиа и всё, что успеет сохраниться локально.");
+        NotificationsCheckCell editsCell = createSpyToggleCell(context, "Сохранять историю правок", "Если сообщение отредактируют, локально останется и предыдущая версия.");
+        NotificationsCheckCell botsCell = createSpyToggleCell(context, "Сохранять в чатах с ботами", "Отдельный флаг для ботов, потому что у них правки и удаления встречаются заметно чаще.");
+        NotificationsCheckCell readDateCell = createSpyToggleCell(context, "Сохранять дату чтения", "Локально сохраняет время чтения, если сервер позже перестанет его показывать.");
+        NotificationsCheckCell lastOnlineCell = createSpyToggleCell(context, "Сохранять последний онлайн", "Запоминает последний известный онлайн для людей со скрытым посещением.");
+        NotificationsCheckCell attachmentsCell = createSpyToggleCell(context, "Сохранять вложения", "Настроить чаты и лимиты");
+
+        bindSpyDeletedToggle(deletedCell);
+        bindSpyEditsToggle(editsCell);
+        bindSpyToggle(botsCell, PREF_SPY_SAVE_BOTS, false);
+        bindSpyToggle(readDateCell, PREF_SPY_SAVE_READ_DATE, false);
+        bindSpyToggle(lastOnlineCell, PREF_SPY_SAVE_LAST_ONLINE, false);
+        bindSpyToggle(attachmentsCell, PREF_SPY_SAVE_ATTACHMENTS, false);
+
+        container.addView(createSpyCard(context, deletedCell, isDarkTheme));
+        container.addView(createSpyCard(context, editsCell, isDarkTheme));
+        container.addView(createSpyCard(context, botsCell, isDarkTheme));
+        container.addView(createSpyCard(context, readDateCell, isDarkTheme));
+        container.addView(createSpyCard(context, lastOnlineCell, isDarkTheme));
+        container.addView(createSpyCard(context, attachmentsCell, isDarkTheme));
+        createSpyActionRow(context, container, R.drawable.msg_mini_customize, "Настроить чаты и лимиты", this::showSpyAttachmentsDialog);
+        updateSpyEditsToggleState();
+
+        spyFolderValueView = createSpyValueRow(context, container, "Папка вложений", getSpyFolderLabel(), this::openSpyFolderPicker);
+
+        TextView sizeHeaderView = new TextView(context);
+        sizeHeaderView.setText("Максимальный размер папки");
+        sizeHeaderView.setTextColor(getSpyAccentColor());
+        sizeHeaderView.setTextSize(14);
+        sizeHeaderView.setTypeface(AndroidUtilities.bold());
+        LinearLayout.LayoutParams sizeHeaderParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        sizeHeaderParams.topMargin = AndroidUtilities.dp(16);
+        sizeHeaderParams.bottomMargin = AndroidUtilities.dp(10);
+        container.addView(sizeHeaderView, sizeHeaderParams);
+
+        FrameLayout sizeCard = new FrameLayout(context);
+        GradientDrawable sizeCardBackground = new GradientDrawable();
+        sizeCardBackground.setShape(GradientDrawable.RECTANGLE);
+        sizeCardBackground.setCornerRadius(AndroidUtilities.dp(20));
+        sizeCardBackground.setColor(ColorUtils.blendARGB(
+                Theme.getColor(Theme.key_windowBackgroundWhite),
+                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText),
+                isDarkTheme ? 0.08f : 0.035f
+        ));
+        sizeCardBackground.setStroke(AndroidUtilities.dp(1), ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText), isDarkTheme ? 28 : 16));
+        sizeCard.setBackground(sizeCardBackground);
+        LinearLayout.LayoutParams sizeCardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(158));
+        sizeCardParams.bottomMargin = AndroidUtilities.dp(18);
+        container.addView(sizeCard, sizeCardParams);
+
+        LinearLayout labelsRow = new LinearLayout(context);
+        labelsRow.setOrientation(LinearLayout.HORIZONTAL);
+        labelsRow.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams labelsParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        labelsParams.leftMargin = AndroidUtilities.dp(18);
+        labelsParams.rightMargin = AndroidUtilities.dp(18);
+        labelsParams.topMargin = AndroidUtilities.dp(18);
+        sizeCard.addView(labelsRow, labelsParams);
+
+        final TextView[] sizeLabelViews = new TextView[SPY_FOLDER_SIZE_LABELS.length];
+        for (int i = 0; i < SPY_FOLDER_SIZE_LABELS.length; i++) {
+            TextView labelView = new TextView(context);
+            labelView.setText(SPY_FOLDER_SIZE_LABELS[i]);
+            labelView.setTextSize(12);
+            labelView.setGravity(i == 0 ? Gravity.LEFT : i == SPY_FOLDER_SIZE_LABELS.length - 1 ? Gravity.RIGHT : Gravity.CENTER_HORIZONTAL);
+            labelView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
+            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            labelsRow.addView(labelView, labelParams);
+            sizeLabelViews[i] = labelView;
+        }
+
+        SeekBarView sizeSeekBar = new SeekBarView(context, resourceProvider);
+        sizeSeekBar.setReportChanges(true);
+        sizeSeekBar.setColors(
+                ColorUtils.setAlphaComponent(getSpyAccentColor(), isDarkTheme ? 58 : 34),
+                getSpyAccentColor()
+        );
+        FrameLayout.LayoutParams sizeSeekParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(44));
+        sizeSeekParams.leftMargin = AndroidUtilities.dp(14);
+        sizeSeekParams.rightMargin = AndroidUtilities.dp(14);
+        sizeSeekParams.topMargin = AndroidUtilities.dp(58);
+        sizeCard.addView(sizeSeekBar, sizeSeekParams);
+
+        TextView sizeInfoView = new TextView(context);
+        sizeInfoView.setText("Если размер папки превышает этот лимит, самые старые вложения будут удалены с устройства.");
+        sizeInfoView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
+        sizeInfoView.setTextSize(13);
+        FrameLayout.LayoutParams sizeInfoParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        sizeInfoParams.leftMargin = AndroidUtilities.dp(18);
+        sizeInfoParams.rightMargin = AndroidUtilities.dp(18);
+        sizeInfoParams.bottomMargin = AndroidUtilities.dp(16);
+        sizeInfoParams.gravity = Gravity.BOTTOM;
+        sizeCard.addView(sizeInfoView, sizeInfoParams);
+
+        Runnable updateSizeLabels = () -> {
+            int selectedIndex = MessagesController.getGlobalMainSettings().getInt(PREF_SPY_FOLDER_SIZE_INDEX, SPY_FOLDER_SIZE_LABELS.length - 1);
+            selectedIndex = Math.max(0, Math.min(SPY_FOLDER_SIZE_LABELS.length - 1, selectedIndex));
+            sizeSeekBar.setProgress(selectedIndex / (float) (SPY_FOLDER_SIZE_LABELS.length - 1));
+            for (int i = 0; i < sizeLabelViews.length; i++) {
+                sizeLabelViews[i].setTextColor(i == selectedIndex ? getSpyAccentColor() : Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
+                sizeLabelViews[i].setTypeface(i == selectedIndex ? AndroidUtilities.bold() : AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MEDIUM));
+            }
+        };
+        sizeSeekBar.setDelegate((stop, progress) -> {
+            int index = Math.max(0, Math.min(SPY_FOLDER_SIZE_LABELS.length - 1, Math.round((SPY_FOLDER_SIZE_LABELS.length - 1) * progress)));
+            MessagesController.getGlobalMainSettings().edit().putInt(PREF_SPY_FOLDER_SIZE_INDEX, index).apply();
+            updateSizeLabels.run();
+        });
+        updateSizeLabels.run();
+
+        createSpyActionRow(context, container, R.drawable.msg_share, "Экспорт базы данных", () -> showSpyExportDialog());
+        createSpyActionRow(context, container, R.drawable.msg_download, "Импорт базы данных", () -> showSpyImportDialog());
+        createSpyActionRow(context, container, R.drawable.msg_delete, "Очистить", () -> showSpyClearDialog());
+    }
+
+    private NotificationsCheckCell createSpyToggleCell(Context context, String title, String subtitle) {
+        NotificationsCheckCell cell = new NotificationsCheckCell(context, 21, subtitle != null ? 92 : 74, false, resourceProvider);
+        cell.setDrawLine(false);
+        cell.setBackgroundColor(0);
+        cell.setTextAndValueAndCheck(title, subtitle, false, 0, false, false);
+        cell.getCheckBox().setColors(
+                Theme.key_switchTrack,
+                Theme.key_switchTrackChecked,
+                Theme.key_windowBackgroundWhite,
+                Theme.key_windowBackgroundWhite
+        );
+        return cell;
+    }
+
+    private void bindSpyToggle(NotificationsCheckCell cell, String prefKey, boolean defaultValue) {
+        boolean enabled = MessagesController.getGlobalMainSettings().getBoolean(prefKey, defaultValue);
+        cell.setChecked(enabled);
+        cell.setOnClickListener(v -> {
+            boolean newValue = !MessagesController.getGlobalMainSettings().getBoolean(prefKey, defaultValue);
+            MessagesController.getGlobalMainSettings().edit().putBoolean(prefKey, newValue).apply();
+            cell.setChecked(newValue);
+        });
+    }
+
+    private void bindSpyDeletedToggle(NotificationsCheckCell cell) {
+        spyDeletedMessagesCell = cell;
+        boolean enabled = MessagesController.getGlobalMainSettings().getBoolean(PREF_SPY_SAVE_DELETED, false);
+        cell.setChecked(enabled);
+        cell.setOnClickListener(v -> {
+            boolean currentValue = MessagesController.getGlobalMainSettings().getBoolean(PREF_SPY_SAVE_DELETED, false);
+            if (currentValue) {
+                MessagesController.getGlobalMainSettings().edit()
+                        .putBoolean(PREF_SPY_SAVE_DELETED, false)
+                        .putBoolean(PREF_SPY_SAVE_EDITS, false)
+                        .apply();
+                cell.setChecked(false);
+                updateSpyEditsToggleState();
+                return;
+            }
+            if (getParentActivity() == null) {
+                return;
+            }
+            AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), resourceProvider);
+            builder.setTitle("Сохранять удалённые сообщения");
+            builder.setMessage("Для полного сохранения удалённых сообщений и одноразовых медиа лучше разрешить AxoGram работать в фоне. Если приложение выгружено, часть удалений может не успеть сохраниться.\n\nЭто также может заметно сильнее расходовать заряд батареи.");
+            builder.setPositiveButton("Включить", (dialog, which) -> {
+                if (isSpyBackgroundPermissionGranted()) {
+                    MessagesController.getGlobalMainSettings().edit().putBoolean(PREF_SPY_SAVE_DELETED, true).apply();
+                    cell.setChecked(true);
+                    updateSpyEditsToggleState();
+                    return;
+                }
+                waitingForSpyBackgroundPermission = true;
+                openSpyBackgroundSettings();
+            });
+            builder.setNeutralButton("Включить без настройки", (dialog, which) -> {
+                MessagesController.getGlobalMainSettings().edit().putBoolean(PREF_SPY_SAVE_DELETED, true).apply();
+                cell.setChecked(true);
+                updateSpyEditsToggleState();
+            });
+            builder.setNegativeButton("Отмена", null);
+            showDialog(builder.create());
+        });
+    }
+
+    private void bindSpyEditsToggle(NotificationsCheckCell cell) {
+        spyEditsCell = cell;
+        boolean enabled = MessagesController.getGlobalMainSettings().getBoolean(PREF_SPY_SAVE_EDITS, false);
+        cell.setChecked(enabled);
+        cell.setOnClickListener(v -> {
+            if (!MessagesController.getGlobalMainSettings().getBoolean(PREF_SPY_SAVE_DELETED, false)) {
+                if (getParentActivity() != null) {
+                    Toast.makeText(getParentActivity(), "Сначала включите сохранение удалённых сообщений", Toast.LENGTH_SHORT).show();
+                }
+                updateSpyEditsToggleState();
+                return;
+            }
+            boolean newValue = !MessagesController.getGlobalMainSettings().getBoolean(PREF_SPY_SAVE_EDITS, false);
+            MessagesController.getGlobalMainSettings().edit().putBoolean(PREF_SPY_SAVE_EDITS, newValue).apply();
+            cell.setChecked(newValue);
+            updateSpyEditsToggleState();
+        });
+        updateSpyEditsToggleState();
+    }
+
+    private void updateSpyEditsToggleState() {
+        if (spyEditsCell == null) {
+            return;
+        }
+        boolean deletedEnabled = MessagesController.getGlobalMainSettings().getBoolean(PREF_SPY_SAVE_DELETED, false);
+        boolean editsEnabled = deletedEnabled && MessagesController.getGlobalMainSettings().getBoolean(PREF_SPY_SAVE_EDITS, false);
+        if (!deletedEnabled && MessagesController.getGlobalMainSettings().getBoolean(PREF_SPY_SAVE_EDITS, false)) {
+            MessagesController.getGlobalMainSettings().edit().putBoolean(PREF_SPY_SAVE_EDITS, false).apply();
+        }
+        spyEditsCell.setChecked(editsEnabled);
+        spyEditsCell.setAlpha(deletedEnabled ? 1.0f : 0.56f);
+        spyEditsCell.setEnabled(deletedEnabled);
+    }
+
+    private void openSpyBackgroundSettings() {
+        Activity activity = getParentActivity();
+        if (activity == null) {
+            return;
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PowerManager powerManager = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
+                String packageName = activity.getPackageName();
+                if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(Uri.parse("package:" + packageName));
+                    activity.startActivity(intent);
+                    return;
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        try {
+            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            activity.startActivity(intent);
+            return;
+        } catch (Throwable ignore) {
+        }
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + activity.getPackageName()));
+            activity.startActivity(intent);
+        } catch (Throwable e) {
+            Toast.makeText(activity, "Не удалось открыть настройки фона", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private boolean isSpyBackgroundPermissionGranted() {
+        Activity activity = getParentActivity();
+        if (activity == null) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return true;
+        }
+        try {
+            PowerManager powerManager = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
+            return powerManager != null && powerManager.isIgnoringBatteryOptimizations(activity.getPackageName());
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
+
+    private View createSpyCard(Context context, View cell, boolean isDarkTheme) {
+        FrameLayout card = new FrameLayout(context);
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(AndroidUtilities.dp(18));
+        background.setColor(ColorUtils.blendARGB(
+                Theme.getColor(Theme.key_windowBackgroundWhite),
+                Theme.getColor(Theme.key_windowBackgroundWhiteBlackText),
+                isDarkTheme ? 0.11f : 0.035f
+        ));
+        background.setStroke(AndroidUtilities.dp(1), ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4), isDarkTheme ? 28 : 16));
+        card.setBackground(background);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = AndroidUtilities.dp(10);
+        card.setLayoutParams(params);
+        card.addView(cell, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
+        return card;
+    }
+
+    private View createSpyInfoText(Context context, String text) {
+        TextView textView = new TextView(context);
+        textView.setText(text);
+        textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
+        textView.setTextSize(13);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = AndroidUtilities.dp(6);
+        params.rightMargin = AndroidUtilities.dp(6);
+        params.topMargin = AndroidUtilities.dp(-2);
+        params.bottomMargin = AndroidUtilities.dp(14);
+        textView.setLayoutParams(params);
+        return textView;
+    }
+
+    private TextView createSpyValueRow(Context context, LinearLayout container, String title, String value, Runnable onClick) {
+        FrameLayout row = new FrameLayout(context);
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(AndroidUtilities.dp(18));
+        background.setColor(ColorUtils.blendARGB(
+                Theme.getColor(Theme.key_windowBackgroundWhite),
+                Theme.getColor(Theme.key_windowBackgroundWhiteBlackText),
+                0.06f
+        ));
+        row.setBackground(background);
+        row.setOnClickListener(v -> onClick.run());
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(72));
+        rowParams.bottomMargin = AndroidUtilities.dp(16);
+        container.addView(row, rowParams);
+
+        TextView titleView = new TextView(context);
+        titleView.setText(title);
+        titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        titleView.setTextSize(17);
+        FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL;
+        titleParams.leftMargin = AndroidUtilities.dp(18);
+        row.addView(titleView, titleParams);
+
+        TextView valueView = new TextView(context);
+        valueView.setText(value);
+        valueView.setTextColor(getSpyAccentColor());
+        valueView.setTextSize(16);
+        valueView.setTypeface(AndroidUtilities.bold());
+        FrameLayout.LayoutParams valueParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        valueParams.gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL;
+        valueParams.rightMargin = AndroidUtilities.dp(18);
+        row.addView(valueView, valueParams);
+        return valueView;
+    }
+
+    private void createSpyActionRow(Context context, LinearLayout container, int iconRes, String title, Runnable onClick) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setBackground(Theme.createSelectorDrawable(ColorUtils.setAlphaComponent(getSpyAccentColor(), 22), Theme.RIPPLE_MASK_ALL));
+        row.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(16), AndroidUtilities.dp(12), AndroidUtilities.dp(16));
+        row.setOnClickListener(v -> onClick.run());
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        container.addView(row, rowParams);
+
+        ImageView iconView = new ImageView(context);
+        iconView.setImageResource(iconRes);
+        iconView.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(AndroidUtilities.dp(28), AndroidUtilities.dp(28));
+        row.addView(iconView, iconParams);
+
+        TextView titleView = new TextView(context);
+        titleView.setText(title);
+        titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        titleView.setTextSize(18);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.leftMargin = AndroidUtilities.dp(18);
+        row.addView(titleView, titleParams);
+
+        View divider = new View(context);
+        divider.setBackgroundColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4), 46));
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1);
+        dividerParams.leftMargin = AndroidUtilities.dp(58);
+        container.addView(divider, dividerParams);
+    }
+
+    private void openSpyFolderPicker() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            startActivityForResult(intent, REQUEST_SPY_ATTACHMENTS_FOLDER);
+        } catch (Exception e) {
+            Toast.makeText(getParentActivity(), "Не удалось открыть выбор папки", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private String getSpyFolderLabel() {
+        return MessagesController.getGlobalMainSettings().getString(PREF_SPY_ATTACHMENTS_FOLDER_LABEL, "не выбрана");
+    }
+
+    private void showSpyExportDialog() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), resourceProvider);
+        builder.setTitle("Экспорт базы данных");
+        builder.setItems(new CharSequence[] {"Отправить в Избранное", "Сохранить на устройство"}, (dialog, which) -> {
+            if (which == 0) {
+                sendSpyDatabaseToSavedMessages();
+            } else if (which == 1) {
+                exportSpyDatabaseToDevice();
+            }
+        });
+        builder.setNegativeButton("Отмена", null);
+        showDialog(builder.create());
+    }
+
+    private void showSpyImportDialog() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("*/*");
+            startActivityForResult(intent, REQUEST_SPY_IMPORT_DATABASE);
+        } catch (Exception e) {
+            if (getParentActivity() != null) {
+                Toast.makeText(getParentActivity(), "Не удалось открыть импорт базы", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void showSpyClearDialog() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), resourceProvider);
+        builder.setTitle("Очистить данные шпиона");
+        builder.setMessage("Удалит локально сохранённые удалённые сообщения и историю правок из базы шпиона.");
+        builder.setPositiveButton("Очистить", (dialog, which) -> {
+            boolean cleared = SpyStorage.getInstance(currentAccount).clearDatabase();
+            Toast.makeText(getParentActivity(), cleared ? "База шпиона очищена" : "Не удалось очистить базу", Toast.LENGTH_SHORT).show();
+        });
+        builder.setNegativeButton("Отмена", null);
+        showDialog(builder.create());
+    }
+
+    private void sendSpyDatabaseToSavedMessages() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        File exportFile = SpyStorage.getInstance(currentAccount).createExportFileCopy();
+        if (exportFile == null || !exportFile.exists()) {
+            Toast.makeText(getParentActivity(), "База ещё не создана", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Uri exportUri;
+        try {
+            exportUri = FileProvider.getUriForFile(getParentActivity(), ApplicationLoader.getApplicationId() + ".provider", exportFile);
+        } catch (Throwable e) {
+            Toast.makeText(getParentActivity(), "Не удалось подготовить базу для отправки", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        long selfDialogId = AccountInstance.getInstance(currentAccount).getUserConfig().getClientUserId();
+        SendMessagesHelper.prepareSendingDocument(
+                AccountInstance.getInstance(currentAccount),
+                null,
+                null,
+                exportUri,
+                null,
+                "application/x-axo",
+                selfDialogId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                true,
+                0,
+                null,
+                null,
+                0,
+                false
+        );
+        Toast.makeText(getParentActivity(), "База отправляется в Избранное", Toast.LENGTH_SHORT).show();
+    }
+
+    private void exportSpyDatabaseToDevice() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("application/octet-stream");
+            intent.putExtra(Intent.EXTRA_TITLE, SpyStorage.DATABASE_FILE_NAME);
+            startActivityForResult(intent, REQUEST_SPY_EXPORT_DATABASE);
+        } catch (Exception e) {
+            if (getParentActivity() != null) {
+                Toast.makeText(getParentActivity(), "Не удалось открыть экспорт базы", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void showSpyAttachmentsDialog() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        Context context = getParentActivity();
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(AndroidUtilities.dp(6), AndroidUtilities.dp(6), AndroidUtilities.dp(6), AndroidUtilities.dp(4));
+
+        final String[] keys = new String[] {
+                PREF_SPY_ATTACH_PRIVATE_DIALOGS,
+                PREF_SPY_ATTACH_PUBLIC_CHANNELS,
+                PREF_SPY_ATTACH_PRIVATE_CHANNELS,
+                PREF_SPY_ATTACH_PUBLIC_CHATS,
+                PREF_SPY_ATTACH_PRIVATE_CHATS
+        };
+        final String[] titles = new String[] {
+                "Личные чаты",
+                "Публичные каналы",
+                "Приватные каналы",
+                "Публичные чаты",
+                "Приватные чаты"
+        };
+        final boolean[] defaults = new boolean[] {false, false, false, false, false};
+        final NotificationsCheckCell[] cells = new NotificationsCheckCell[keys.length];
+        for (int i = 0; i < keys.length; i++) {
+            NotificationsCheckCell cell = new NotificationsCheckCell(context, 16, 68, false, resourceProvider);
+            cell.setDrawLine(false);
+            cell.setBackgroundColor(0);
+            boolean value = MessagesController.getGlobalMainSettings().getBoolean(keys[i], defaults[i]);
+            cell.setTextAndValueAndCheck(titles[i], null, value, 0, false, i != keys.length - 1);
+            cell.getCheckBox().setColors(Theme.key_switchTrack, Theme.key_switchTrackChecked, Theme.key_windowBackgroundWhite, Theme.key_windowBackgroundWhite);
+            final int index = i;
+            cell.setOnClickListener(v -> {
+                boolean newValue = !MessagesController.getGlobalMainSettings().getBoolean(keys[index], defaults[index]);
+                MessagesController.getGlobalMainSettings().edit().putBoolean(keys[index], newValue).apply();
+                cell.setChecked(newValue);
+            });
+            layout.addView(cell, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            cells[i] = cell;
+        }
+
+        TextView mobileLabel = createSpyDialogHeader(context, "Лимит на размер (моб.)");
+        layout.addView(mobileLabel);
+        SeekBarView mobileSeekBar = new SeekBarView(context, resourceProvider);
+        mobileSeekBar.setReportChanges(true);
+        mobileSeekBar.setColors(ColorUtils.setAlphaComponent(getSpyAccentColor(), 48), getSpyAccentColor());
+        layout.addView(mobileSeekBar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(38)));
+        TextView mobileValue = createSpyDialogValue(context);
+        layout.addView(mobileValue);
+
+        TextView wifiLabel = createSpyDialogHeader(context, "Лимит на размер (WiFi)");
+        layout.addView(wifiLabel);
+        SeekBarView wifiSeekBar = new SeekBarView(context, resourceProvider);
+        wifiSeekBar.setReportChanges(true);
+        wifiSeekBar.setColors(ColorUtils.setAlphaComponent(getSpyAccentColor(), 48), getSpyAccentColor());
+        layout.addView(wifiSeekBar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(38)));
+        TextView wifiValue = createSpyDialogValue(context);
+        layout.addView(wifiValue);
+
+        Runnable updateAttachmentLimits = () -> {
+            int mobileIndex = clampSpyLimitIndex(MessagesController.getGlobalMainSettings().getInt(PREF_SPY_ATTACH_MOBILE_LIMIT_INDEX, 1));
+            int wifiIndex = clampSpyLimitIndex(MessagesController.getGlobalMainSettings().getInt(PREF_SPY_ATTACH_WIFI_LIMIT_INDEX, 3));
+            mobileSeekBar.setProgress(mobileIndex / (float) (SPY_ATTACHMENT_LIMIT_LABELS.length - 1));
+            wifiSeekBar.setProgress(wifiIndex / (float) (SPY_ATTACHMENT_LIMIT_LABELS.length - 1));
+            mobileValue.setText(SPY_ATTACHMENT_LIMIT_LABELS[mobileIndex]);
+            wifiValue.setText(SPY_ATTACHMENT_LIMIT_LABELS[wifiIndex]);
+        };
+        mobileSeekBar.setDelegate((stop, progress) -> {
+            int index = clampSpyLimitIndex(Math.round((SPY_ATTACHMENT_LIMIT_LABELS.length - 1) * progress));
+            MessagesController.getGlobalMainSettings().edit().putInt(PREF_SPY_ATTACH_MOBILE_LIMIT_INDEX, index).apply();
+            updateAttachmentLimits.run();
+        });
+        wifiSeekBar.setDelegate((stop, progress) -> {
+            int index = clampSpyLimitIndex(Math.round((SPY_ATTACHMENT_LIMIT_LABELS.length - 1) * progress));
+            MessagesController.getGlobalMainSettings().edit().putInt(PREF_SPY_ATTACH_WIFI_LIMIT_INDEX, index).apply();
+            updateAttachmentLimits.run();
+        });
+        updateAttachmentLimits.run();
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(context, resourceProvider);
+        builder.setTitle("Сохранять вложения");
+        builder.setView(layout);
+        builder.setNegativeButton("Отмена", null);
+        builder.setPositiveButton("Сохранить", null);
+        showDialog(builder.create());
+    }
+
+    private TextView createSpyDialogHeader(Context context, String text) {
+        TextView textView = new TextView(context);
+        textView.setText(text);
+        textView.setTextColor(getSpyAccentColor());
+        textView.setTextSize(15);
+        textView.setTypeface(AndroidUtilities.bold());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.topMargin = AndroidUtilities.dp(16);
+        textView.setLayoutParams(params);
+        return textView;
+    }
+
+    private TextView createSpyDialogValue(Context context) {
+        TextView textView = new TextView(context);
+        textView.setTextColor(getSpyAccentColor());
+        textView.setTextSize(15);
+        textView.setTypeface(AndroidUtilities.bold());
+        textView.setGravity(Gravity.RIGHT);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.topMargin = AndroidUtilities.dp(2);
+        params.bottomMargin = AndroidUtilities.dp(8);
+        textView.setLayoutParams(params);
+        return textView;
+    }
+
+    private int clampSpyLimitIndex(int index) {
+        return Math.max(0, Math.min(SPY_ATTACHMENT_LIMIT_LABELS.length - 1, index));
+    }
+
+    private int getSpyAccentColor() {
+        boolean isDarkTheme = resourceProvider != null ? resourceProvider.isDark() : Theme.isCurrentThemeDark();
+        return isDarkTheme ? 0xFFE279AE : 0xFFD75B93;
+    }
+
+    @Override
+    public void onActivityResultFragment(int requestCode, int resultCode, Intent data) {
+        if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null || getParentActivity() == null) {
+            return;
+        }
+        if (requestCode == REQUEST_SPY_EXPORT_DATABASE) {
+            boolean exported = SpyStorage.getInstance(currentAccount).exportToOutputStream(data.getData());
+            Toast.makeText(getParentActivity(), exported ? "База сохранена" : "Не удалось сохранить базу", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (requestCode == REQUEST_SPY_IMPORT_DATABASE) {
+            String fileName = MediaController.getFileName(data.getData());
+            if (fileName == null || !fileName.toLowerCase().endsWith(".axo")) {
+                Toast.makeText(getParentActivity(), "Нужен файл базы .axo", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            boolean imported = SpyStorage.getInstance(currentAccount).importFromUri(data.getData());
+            Toast.makeText(getParentActivity(), imported ? "База импортирована" : "Не удалось импортировать базу", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (requestCode != REQUEST_SPY_ATTACHMENTS_FOLDER) {
+            return;
+        }
+        Uri uri = data.getData();
+        try {
+            int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                getParentActivity().getContentResolver().takePersistableUriPermission(uri, flags);
+            }
+        } catch (Exception ignore) {
+        }
+        String label = "выбрана";
+        try {
+            String documentId = DocumentsContract.getTreeDocumentId(uri);
+            if (documentId != null && !documentId.isEmpty()) {
+                int separatorIndex = documentId.indexOf(':');
+                label = separatorIndex >= 0 && separatorIndex < documentId.length() - 1 ? documentId.substring(separatorIndex + 1) : documentId;
+            }
+        } catch (Exception ignore) {
+        }
+        MessagesController.getGlobalMainSettings().edit()
+                .putString(PREF_SPY_ATTACHMENTS_FOLDER_URI, uri.toString())
+                .putString(PREF_SPY_ATTACHMENTS_FOLDER_LABEL, label)
+                .apply();
+        if (spyFolderValueView != null) {
+            spyFolderValueView.setText(label);
+        }
+        Toast.makeText(getParentActivity(), "Папка выбрана", Toast.LENGTH_SHORT).show();
     }
 
     private void addPlaceholderContent(Context context, FrameLayout contentView) {
